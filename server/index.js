@@ -58,40 +58,54 @@ function buildChartPayload(name, birthData, rasi, panchanga, dasha, vargaCatalog
     return `${n}${['th', 'st', 'nd', 'rd'][n % 10] || 'th'}`
   }
 
-  const planets = (rasi?.grahas || []).map((p) => ({
-    name: p.name,
-    sign: p.rasi_name,
-    degree: p.dms || `${p.degrees_in_rasi.toFixed(0)}°`,
-    nakshatra: `${p.nakshatra_name} • Pada ${p.pada}`,
-    house: ordinal(p.house),
-    houseNumber: p.house,
-    retrograde: Boolean(p.retrograde),
-    combust: Boolean(p.combust),
-    status: p.dignity || 'Calculated',
-    // Rich astronomical properties
-    id: p.id,
-    longitude: p.longitude,
-    latitude: p.latitude,
-    speed: p.speed,
-    degrees_in_rasi: p.degrees_in_rasi,
-    dms: p.dms,
-    sign_dm: p.sign_dm,
-    rasi_dm: p.rasi_dm,
-    rasi_index: p.rasi,
-    nakshatra_number: p.nakshatra,
-    nakshatra_name: p.nakshatra_name,
-    pada: p.pada,
-    house_labels: p.house_labels || [],
-    dignity: p.dignity,
-    sun_separation: p.sun_separation,
-    lord_of_houses: p.lord_of_houses || [],
-  }))
+  const SIGN_LORDS = {
+    Aries: 'Mars', Taurus: 'Venus', Gemini: 'Mercury', Cancer: 'Moon',
+    Leo: 'Sun', Virgo: 'Mercury', Libra: 'Venus', Scorpio: 'Mars',
+    Sagittarius: 'Jupiter', Capricorn: 'Saturn', Aquarius: 'Saturn', Pisces: 'Jupiter',
+  }
+
+  const planets = (rasi?.grahas || []).map((p) => {
+    let lordHouses = p.lord_of_houses
+    if (!lordHouses || lordHouses.length === 0) {
+      lordHouses = (rasi?.bhavas || [])
+        .filter((b) => SIGN_LORDS[b.rasi_name] === p.name)
+        .map((b) => b.house)
+    }
+    return {
+      name: p.name,
+      sign: p.rasi_name,
+      degree: p.dms || `${p.degrees_in_rasi.toFixed(0)}°`,
+      nakshatra: `${p.nakshatra_name} • Pada ${p.pada}`,
+      house: ordinal(p.house),
+      houseNumber: p.house,
+      retrograde: Boolean(p.retrograde),
+      combust: Boolean(p.combust),
+      status: p.dignity || 'Calculated',
+      // Rich astronomical properties
+      id: p.id,
+      longitude: p.longitude,
+      latitude: p.latitude,
+      speed: p.speed,
+      degrees_in_rasi: p.degrees_in_rasi,
+      dms: p.dms,
+      sign_dm: p.sign_dm,
+      rasi_dm: p.rasi_dm,
+      rasi_index: p.rasi,
+      nakshatra_number: p.nakshatra,
+      nakshatra_name: p.nakshatra_name,
+      pada: p.pada,
+      house_labels: p.house_labels || [],
+      dignity: p.dignity,
+      sun_separation: p.sun_separation,
+      lord_of_houses: lordHouses || [],
+    }
+  })
 
   const houses = (rasi?.bhavas || []).map((b) => ({
     number: b.house,
     name: `${ordinal(b.house)} House`,
     sign: b.rasi_name,
-    lord: '—',
+    lord: SIGN_LORDS[b.rasi_name] || '—',
     occupants: planets.filter((p) => p.houseNumber === b.house).map((p) => p.name),
     start: b.start,
     middle: b.middle,

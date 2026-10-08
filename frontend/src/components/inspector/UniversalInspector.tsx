@@ -85,6 +85,10 @@ export const UniversalInspector: React.FC<UniversalInspectorProps> = ({
               onSelectHouse(hNum)
               onChangeTab('house')
             }}
+            onSelectPlanet={(pName) => {
+              onSelectPlanet(pName)
+              onChangeTab('planet')
+            }}
           />
         )}
 
@@ -95,6 +99,10 @@ export const UniversalInspector: React.FC<UniversalInspectorProps> = ({
             onSelectPlanet={(pName) => {
               onSelectPlanet(pName)
               onChangeTab('planet')
+            }}
+            onSelectHouse={(hNum) => {
+              onSelectHouse(hNum)
+              onChangeTab('house')
             }}
           />
         )}

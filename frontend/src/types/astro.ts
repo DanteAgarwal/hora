@@ -64,20 +64,48 @@ export interface PlanetPosition {
   lordOfHouses: number[] // e.g. [4, 9]
   dispositor: string
   sunSeparation?: number
+  charaKaraka?: string // e.g. "Atmakaraka (AK)"
+  charaKarakaCode?: string // "AK", "AmK", "BK", "MK", "PK", "GK", "DK"
+  naturalKaraka?: string // e.g. "Soul (Atma), Vitality, Father (Pitri)"
+  functionalRole?: string // e.g. "Yogakaraka (4th & 9th Lord)"
+  functionalType?: 'Yogakaraka' | 'Lagna Lord' | 'Functional Benefic' | 'Functional Malefic' | 'Maraka' | 'Neutral'
+  aspectsCast?: {
+    house: number
+    houseOrdinal: string
+    sign: string
+    type: string
+    aspectedPlanets: string[]
+  }[]
+  aspectsReceived?: {
+    planet: string
+    type: string
+  }[]
+  temporalRelation?: 'Friend' | 'Enemy'
+  compoundRelation?: string
 }
 
 export interface HousePosition {
   number: number // 1 to 12
   name: string // e.g. "1st House (Lagna)"
+  sanskritName?: string // e.g. "Tanu Bhava"
   sign: string // e.g. "Leo"
   signNumber: number // 1 to 12
   signIndex: number // 0 to 11
   lord: string // e.g. "Sun"
+  lordHouseNumber?: number
+  lordHouseOrdinal?: string
+  lordSign?: string
+  lordDignity?: DignityType
+  naturalKaraka?: string
   occupants: string[] // Planet names
   aspectsReceived: {
     planet: string
     type: string
   }[]
+  bhavatBhavam?: string
+  significations?: string[]
+  purushartha?: 'Dharma' | 'Artha' | 'Kama' | 'Moksha'
+  classificationTags?: string[]
   startLongitude?: number
   cuspLongitude?: number
   endLongitude?: number

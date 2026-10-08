@@ -571,6 +571,7 @@ function App() {
   const [selectedPlanet, setSelectedPlanet] = useState<string>('Sun')
   const [selectedHouse, setSelectedHouse] = useState<number>(1)
   const [inspectorTab, setInspectorTab] = useState<'planet' | 'house'>('planet')
+  const [tableTab, setTableTab] = useState<'planets' | 'houses'>('planets')
   const [chart, setChart] = useState<AstroChart | null>(null)
   const [savedCharts, setSavedCharts] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
@@ -843,11 +844,25 @@ function App() {
                   <div className="facts-box">
                     <p className="eyebrow">Explore</p>
                     <div className="chip-grid">
-                      <button type="button" className={`chip-button ${inspectorTab === 'house' ? 'selected' : ''}`} onClick={() => setInspectorTab('house')}>
-                        Houses
+                      <button
+                        type="button"
+                        className={`chip-button ${tableTab === 'houses' ? 'selected' : ''}`}
+                        onClick={() => {
+                          setInspectorTab('house')
+                          setTableTab('houses')
+                        }}
+                      >
+                        🏛️ Houses
                       </button>
-                      <button type="button" className={`chip-button ${inspectorTab === 'planet' ? 'selected' : ''}`} onClick={() => setInspectorTab('planet')}>
-                        Planets
+                      <button
+                        type="button"
+                        className={`chip-button ${tableTab === 'planets' ? 'selected' : ''}`}
+                        onClick={() => {
+                          setInspectorTab('planet')
+                          setTableTab('planets')
+                        }}
+                      >
+                        🪐 Planets
                       </button>
                       <button type="button" className="chip-button" onClick={() => setSelectedNav('Charts')}>
                         Vargas
@@ -862,43 +877,313 @@ function App() {
             </section>
 
             <section className="lower-grid">
-              <div className="panel">
-                <div className="section-header">
-                  <h3>Planetary positions</h3>
-                  <span className="eyebrow">9 Grahas + Lagna</span>
+              <div className="panel" style={{ overflowX: 'auto' }}>
+                <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <h3 style={{ margin: 0 }}>
+                      {tableTab === 'planets' ? 'Planetary Positions' : 'House Placements (Bhavas)'}
+                    </h3>
+                    <span className="eyebrow">
+                      {tableTab === 'planets' ? '9 Grahas + Lagna' : '12 Classical Bhavas'}
+                    </span>
+                  </div>
+
+                  {/* Toggle tabs for inspection table */}
+                  <div className="segmented-control" style={{ display: 'flex', background: 'rgba(30, 41, 59, 0.7)', borderRadius: 6, padding: 2, border: '1px solid rgba(148, 163, 184, 0.25)' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTableTab('planets')
+                        setInspectorTab('planet')
+                      }}
+                      style={{
+                        padding: '4px 10px',
+                        fontSize: '0.74rem',
+                        border: 'none',
+                        borderRadius: 4,
+                        cursor: 'pointer',
+                        background: tableTab === 'planets' ? '#d97706' : 'transparent',
+                        color: tableTab === 'planets' ? '#fff' : '#94a3b8',
+                        fontWeight: tableTab === 'planets' ? 600 : 400,
+                      }}
+                    >
+                      🪐 Planets ({chart.planets.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTableTab('houses')
+                        setInspectorTab('house')
+                      }}
+                      style={{
+                        padding: '4px 10px',
+                        fontSize: '0.74rem',
+                        border: 'none',
+                        borderRadius: 4,
+                        cursor: 'pointer',
+                        background: tableTab === 'houses' ? '#d97706' : 'transparent',
+                        color: tableTab === 'houses' ? '#fff' : '#94a3b8',
+                        fontWeight: tableTab === 'houses' ? 600 : 400,
+                      }}
+                    >
+                      🏛️ Houses (12)
+                    </button>
+                  </div>
                 </div>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Planet</th>
-                      <th>Longitude</th>
-                      <th>Sign</th>
-                      <th>House</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {chart.planets.map((planet) => (
-                      <tr
-                        key={planet.name}
-                        onClick={() => {
-                          setSelectedPlanet(planet.name)
-                          setInspectorTab('planet')
-                        }}
-                        style={{ cursor: 'pointer', background: selectedPlanet === planet.name ? 'rgba(217, 119, 6, 0.16)' : undefined }}
-                        title="Click to inspect this planet in the Object Inspector"
-                      >
-                        <td>
-                          <strong>{planet.name}</strong> <small style={{ color: '#94a3b8' }}>({planet.sanskritName})</small>
-                          {planet.retrograde && <span style={{ color: '#f59e0b', marginLeft: 4, fontWeight: 'bold' }}>[R]</span>}
-                          {planet.combust && <span style={{ color: '#ef4444', marginLeft: 2, fontWeight: 'bold' }}>*</span>}
-                        </td>
-                        <td>{planet.dms}</td>
-                        <td>{planet.sign}</td>
-                        <td>{planet.houseOrdinal}</td>
+
+                {tableTab === 'planets' ? (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Planet</th>
+                        <th>Longitude</th>
+                        <th>Sign (Rashi)</th>
+                        <th>House</th>
+                        <th>Lord of Houses</th>
+                        <th>Dignity</th>
+                        <th>Nakshatra</th>
+                        <th>Chara Karaka</th>
+                        <th>Role</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {chart.planets.map((planet) => {
+                        const isSelected = selectedPlanet === planet.name && inspectorTab === 'planet'
+                        return (
+                          <tr
+                            key={planet.name}
+                            onClick={() => {
+                              setSelectedPlanet(planet.name)
+                              setInspectorTab('planet')
+                            }}
+                            style={{
+                              cursor: 'pointer',
+                              background: isSelected ? 'rgba(217, 119, 6, 0.18)' : undefined,
+                              borderLeft: isSelected ? '3px solid #d97706' : undefined,
+                            }}
+                            title="Click to inspect this planet in the Object Inspector"
+                          >
+                            <td>
+                              <span style={{ marginRight: 6, color: '#fbbf24' }}>{planet.symbol}</span>
+                              <strong>{planet.name}</strong> <small style={{ color: '#94a3b8' }}>({planet.sanskritName})</small>
+                              {planet.retrograde && <span style={{ color: '#f59e0b', marginLeft: 4, fontWeight: 'bold' }}>[R]</span>}
+                              {planet.combust && <span style={{ color: '#ef4444', marginLeft: 2, fontWeight: 'bold' }} title="Combust with Sun">*</span>}
+                            </td>
+                            <td>{planet.dms}</td>
+                            <td>{planet.sign}</td>
+                            <td>
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setSelectedHouse(planet.houseNumber)
+                                  setInspectorTab('house')
+                                  setTableTab('houses')
+                                }}
+                                style={{ color: '#38bdf8', textDecoration: 'underline' }}
+                                title={`Jump to House ${planet.houseNumber}`}
+                              >
+                                {planet.houseOrdinal}
+                              </span>
+                            </td>
+                            <td>
+                              {planet.lordOfHouses && planet.lordOfHouses.length > 0 ? (
+                                <span style={{ color: '#38bdf8', fontWeight: 600 }}>
+                                  {planet.lordOfHouses.map((h) => `${h}th`).join(' & ')}
+                                </span>
+                              ) : (
+                                <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Node / Shadow</span>
+                              )}
+                            </td>
+                            <td>
+                              <span
+                                style={{
+                                  padding: '2px 6px',
+                                  borderRadius: 4,
+                                  fontSize: '0.72rem',
+                                  fontWeight: 600,
+                                  background:
+                                    planet.dignity === 'Exalted'
+                                      ? 'rgba(251, 191, 36, 0.15)'
+                                      : planet.dignity === 'Own Sign'
+                                      ? 'rgba(52, 211, 153, 0.15)'
+                                      : planet.dignity === 'Debilitated'
+                                      ? 'rgba(248, 113, 113, 0.15)'
+                                      : 'rgba(255, 255, 255, 0.05)',
+                                  color:
+                                    planet.dignity === 'Exalted'
+                                      ? '#fbbf24'
+                                      : planet.dignity === 'Own Sign'
+                                      ? '#34d399'
+                                      : planet.dignity === 'Debilitated'
+                                      ? '#f87171'
+                                      : '#cbd5e1',
+                                }}
+                              >
+                                {planet.dignity}
+                              </span>
+                            </td>
+                            <td>
+                              <span style={{ fontSize: '0.78rem' }}>
+                                {planet.nakshatra} (P{planet.pada})
+                              </span>
+                            </td>
+                            <td>
+                              {planet.charaKarakaCode ? (
+                                <span
+                                  style={{
+                                    padding: '2px 5px',
+                                    borderRadius: 4,
+                                    fontSize: '0.72rem',
+                                    background: 'rgba(217, 119, 6, 0.15)',
+                                    color: '#f59e0b',
+                                    fontWeight: 700,
+                                  }}
+                                  title={planet.charaKaraka}
+                                >
+                                  {planet.charaKarakaCode}
+                                </span>
+                              ) : (
+                                <span style={{ color: '#64748b' }}>—</span>
+                              )}
+                            </td>
+                            <td>
+                              <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                                {planet.functionalType || 'Neutral'}
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                ) : (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Bhava (House)</th>
+                        <th>Sign (Rashi)</th>
+                        <th>House Lord</th>
+                        <th>Lord's Placement</th>
+                        <th>Occupants</th>
+                        <th>Aspects Received</th>
+                        <th>Natural Karaka</th>
+                        <th>Classification</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {chart.houses.map((house) => {
+                        const isSelected = selectedHouse === house.number && inspectorTab === 'house'
+                        const lordPlanet = chart.planets.find((p) => p.name === house.lord)
+                        return (
+                          <tr
+                            key={house.number}
+                            onClick={() => {
+                              setSelectedHouse(house.number)
+                              setInspectorTab('house')
+                            }}
+                            style={{
+                              cursor: 'pointer',
+                              background: isSelected ? 'rgba(56, 189, 248, 0.15)' : undefined,
+                              borderLeft: isSelected ? '3px solid #38bdf8' : undefined,
+                            }}
+                            title="Click to inspect this house in the Object Inspector"
+                          >
+                            <td>
+                              <strong style={{ color: '#38bdf8' }}>H{house.number}</strong>{' '}
+                              <span style={{ fontSize: '0.8rem', color: '#f8fafc' }}>
+                                {house.name.replace(' House', '')}
+                              </span>
+                              {house.sanskritName && (
+                                <small style={{ display: 'block', color: '#94a3b8', fontSize: '0.7rem' }}>
+                                  {house.sanskritName.split(' (')[0]}
+                                </small>
+                              )}
+                            </td>
+                            <td>
+                              <strong>{house.sign}</strong>
+                              <small style={{ display: 'block', color: '#94a3b8', fontSize: '0.7rem' }}>
+                                Sign {house.signNumber}
+                              </small>
+                            </td>
+                            <td>
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (lordPlanet) {
+                                    setSelectedPlanet(lordPlanet.name)
+                                    setInspectorTab('planet')
+                                    setTableTab('planets')
+                                  }
+                                }}
+                                style={{ color: '#fbbf24', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+                                title={`Inspect Lord ${house.lord}`}
+                              >
+                                {house.lord} ↗
+                              </span>
+                            </td>
+                            <td>
+                              {lordPlanet ? (
+                                <span style={{ fontSize: '0.78rem', color: '#cbd5e1' }}>
+                                  In <strong>{lordPlanet.houseOrdinal}</strong> ({lordPlanet.sign})
+                                </span>
+                              ) : (
+                                <span style={{ color: '#94a3b8' }}>—</span>
+                              )}
+                            </td>
+                            <td>
+                              {house.occupants.length > 0 ? (
+                                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                  {house.occupants.map((occ) => (
+                                    <span
+                                      key={occ}
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setSelectedPlanet(occ)
+                                        setInspectorTab('planet')
+                                        setTableTab('planets')
+                                      }}
+                                      style={{
+                                        background: 'rgba(255, 255, 255, 0.08)',
+                                        color: '#f8fafc',
+                                        padding: '1px 5px',
+                                        borderRadius: 4,
+                                        fontSize: '0.72rem',
+                                        cursor: 'pointer',
+                                      }}
+                                    >
+                                      {occ}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span style={{ color: '#64748b', fontStyle: 'italic', fontSize: '0.75rem' }}>Empty</span>
+                              )}
+                            </td>
+                            <td>
+                              {house.aspectsReceived && house.aspectsReceived.length > 0 ? (
+                                <span style={{ fontSize: '0.74rem', color: '#cbd5e1' }}>
+                                  {house.aspectsReceived.map((a) => a.planet).join(', ')}
+                                </span>
+                              ) : (
+                                <span style={{ color: '#64748b', fontSize: '0.75rem' }}>None</span>
+                              )}
+                            </td>
+                            <td>
+                              <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
+                                {house.naturalKaraka?.split(' ')[0] || '—'}
+                              </span>
+                            </td>
+                            <td>
+                              <span style={{ fontSize: '0.72rem', color: '#e2e8f0' }}>
+                                {house.categories.slice(0, 2).map((c) => c.split(' (')[0]).join(', ')}
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                )}
               </div>
 
               <div className="panel">

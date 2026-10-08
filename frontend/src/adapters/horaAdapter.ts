@@ -115,6 +115,115 @@ function deriveHouseCategories(houseNumber: number): string[] {
   return cats
 }
 
+export const NAKSHATRA_LORDS = [
+  'Ketu', 'Venus', 'Sun', 'Moon', 'Mars', 'Rahu', 'Jupiter', 'Saturn', 'Mercury'
+]
+
+export const PLANET_NATURAL_KARAKAS: Record<string, string> = {
+  Sun: 'Soul (Atma), Father (Pitri), Vitality, Royalty, Government, Willpower',
+  Moon: 'Mind (Manas), Mother (Matri), Emotions, Peace, Memory, Nourishment',
+  Mars: 'Courage (Parakrama), Siblings (Bhratri), Real Estate, Energy, Technical Skill',
+  Mercury: 'Intellect (Buddhi), Speech (Vak), Commerce, Analysis, Education, Trade',
+  Jupiter: 'Wisdom (Guru), Wealth (Dhana), Children (Santana), Dharma, Divine Grace',
+  Venus: 'Spouse & Love (Kalatra), Arts, Vehicles, Refinement, Sensual Harmony',
+  Saturn: 'Longevity (Ayush), Discipline, Hard Work, Grief/Endurance, Service, Detachment',
+  Rahu: 'Worldly Ambition, Foreign Connections, Innovation, Unconventionality, Maya',
+  Ketu: 'Liberation (Moksha), Spiritual Detachment, Occult Knowledge, Renunciation',
+}
+
+export const HOUSE_METADATA: Record<number, {
+  sanskrit: string
+  karaka: string
+  bhavatBhavam: string
+  purushartha: 'Dharma' | 'Artha' | 'Kama' | 'Moksha'
+  significations: string[]
+}> = {
+  1: {
+    sanskrit: 'Tanu Bhava (Body / Self / Lagna)',
+    karaka: 'Sun (Vitality, Soul, Physical Constitution)',
+    bhavatBhavam: '1st from 1st — Foundation of all 12 bhavas',
+    purushartha: 'Dharma',
+    significations: ['Physical constitution', 'Personality & self-image', 'Vitality & health', 'Life path & fame', 'Head & brain'],
+  },
+  2: {
+    sanskrit: 'Dhana Bhava (Wealth / Family / Speech)',
+    karaka: 'Jupiter (Wealth, Family, Speech)',
+    bhavatBhavam: '8th from 7th (Spouse longevity & partner resources)',
+    purushartha: 'Artha',
+    significations: ['Accumulated wealth & savings', 'Lineage & early family', 'Vak (Speech & eloquence)', 'Dietary habits', 'Right eye & face'],
+  },
+  3: {
+    sanskrit: 'Sahaja Bhava (Siblings / Courage / Effort)',
+    karaka: 'Mars (Courage, Siblings, Enterprise)',
+    bhavatBhavam: '8th from 8th (Secondary longevity & vitality)',
+    purushartha: 'Kama',
+    significations: ['Valor & enterprise (Parakrama)', 'Younger siblings', 'Hands, arms & manual skill', 'Short journeys & communications', 'Desires & hobbies'],
+  },
+  4: {
+    sanskrit: 'Sukha Bhava (Happiness / Mother / Home)',
+    karaka: 'Moon & Venus (Mother, Peace, Vehicles)',
+    bhavatBhavam: '4th from 1st (Heart & inner emotional core)',
+    purushartha: 'Moksha',
+    significations: ['Mother (Matri) & maternal lineage', 'Inner peace & mental contentment', 'Real estate, land & fixed home', 'Vehicles (Vahana)', 'Chest, heart & lungs'],
+  },
+  5: {
+    sanskrit: 'Putra Bhava (Children / Intellect / Purva Punya)',
+    karaka: 'Jupiter (Children, Wisdom, Higher intellect)',
+    bhavatBhavam: '9th from 9th (Highest dharma & divine grace)',
+    purushartha: 'Dharma',
+    significations: ['Children & lineage continuity', 'Purva Punya (Past life merits)', 'Creative intelligence & discernment (Dhi)', 'Mantras, devotion & speculation', 'Stomach & spine'],
+  },
+  6: {
+    sanskrit: 'Ari / Shatru Bhava (Enemies / Health / Service)',
+    karaka: 'Mars & Saturn (Overcoming debts, disease & adversaries)',
+    bhavatBhavam: '12th from 7th (Losses/challenges to competitors)',
+    purushartha: 'Artha',
+    significations: ['Overcoming obstacles & rivals', 'Daily work, service & employees', 'Debts (Rina) & litigations', 'Physical ailments (Roga)', 'Intestines & digestive fire'],
+  },
+  7: {
+    sanskrit: 'Yuvati / Kalatra Bhava (Spouse / Union / Partnerships)',
+    karaka: 'Venus (Spouse, Love, Marital harmony)',
+    bhavatBhavam: '10th from 10th (Secondary career, trade & public action)',
+    purushartha: 'Kama',
+    significations: ['Spouse & marriage (Kalatra)', 'Business partnerships & contracts', 'Foreign travel & trade', 'Public interactions', 'Kidneys & lower abdomen'],
+  },
+  8: {
+    sanskrit: 'Randhra Bhava (Transformation / Longevity / Occult)',
+    karaka: 'Saturn (Longevity, Grief, Hidden endurance)',
+    bhavatBhavam: '2nd from 7th (Partner assets & joint finances)',
+    purushartha: 'Moksha',
+    significations: ['Ayush (Longevity & life-span)', 'Sudden transformations & crises', 'Inheritance & unearned wealth', 'Occult studies & deep research', 'Reproductive organs'],
+  },
+  9: {
+    sanskrit: 'Dharma Bhava (Fortune / Guru / Divine Law)',
+    karaka: 'Jupiter & Sun (Guru, Dharma, Father, Divine grace)',
+    bhavatBhavam: '5th from 5th (Purva punya of knowledge & grandchildren)',
+    purushartha: 'Dharma',
+    significations: ['Bhagya (Good fortune & divine grace)', 'Guru & spiritual preceptors', 'Father & righteousness (Dharma)', 'Higher philosophical learning', 'Hips & thighs'],
+  },
+  10: {
+    sanskrit: 'Karma Bhava (Profession / Action / Status)',
+    karaka: 'Mercury, Sun, Jupiter, Saturn (Career, Karma, Authority)',
+    bhavatBhavam: '7th from 4th (External world vs home)',
+    purushartha: 'Artha',
+    significations: ['Career, profession & vocation', 'Public standing, prestige & honors', 'Government authority & leadership', 'Worldly duty & achievements', 'Knees & joints'],
+  },
+  11: {
+    sanskrit: 'Labha Bhava (Gains / Aspirations / Networks)',
+    karaka: 'Jupiter (Gains, Inflow of wealth, Fulfillment)',
+    bhavatBhavam: '6th from 6th (Secondary overcoming of difficulties)',
+    purushartha: 'Kama',
+    significations: ['Material gains & steady profits', 'Elder siblings & mentors', 'Social networks & large associations', 'Fulfillment of long-term desires', 'Calves, ankles & left ear'],
+  },
+  12: {
+    sanskrit: 'Vyaya Bhava (Expenditure / Isolation / Moksha)',
+    karaka: 'Saturn & Ketu (Moksha, Release, Spiritual solitude)',
+    bhavatBhavam: '4th from 9th (Spiritual shelter); Final culmination',
+    purushartha: 'Moksha',
+    significations: ['Expenditure & charitable giving', 'Foreign lands & distant settlements', 'Spiritual liberation (Moksha)', 'Subconscious mind & dreams', 'Feet & left eye'],
+  },
+}
+
 /**
  * Derives D9 Navamsha sign index from tropical/sidereal longitude.
  * Formula: Each sign has 9 padas of 3°20' (3.333333°).
@@ -197,6 +306,25 @@ export function normalizeChartPayload(computed: any): AstroChart {
       }
     }
 
+    const finalNakNum = typeof nakshatraNum === 'number' ? nakshatraNum : parseInt(nakshatraNum) || 1
+    const nakshatraLord = NAKSHATRA_LORDS[(finalNakNum - 1) % 9] || '—'
+
+    // Robust Parashari Lord of Houses calculation
+    let lordOfHouses: number[] = []
+    if (Array.isArray(p.lord_of_houses) && p.lord_of_houses.length > 0) {
+      lordOfHouses = [...p.lord_of_houses]
+    } else {
+      for (let h = 1; h <= 12; h++) {
+        const hSignIdx = (lagnaSignIndex + (h - 1)) % 12
+        const hSignName = SIGN_NAMES[hSignIdx]
+        if (SIGN_LORDS[hSignName] === pName) {
+          lordOfHouses.push(h)
+        }
+      }
+    }
+
+    const naturalKaraka = PLANET_NATURAL_KARAKAS[pName] || '—'
+
     planets.push({
       id: p.id !== undefined ? p.id : i,
       name: pName,
@@ -217,14 +345,110 @@ export function normalizeChartPayload(computed: any): AstroChart {
       houseOrdinal: getOrdinal(houseNumber),
       houseLabels: p.house_labels || deriveHouseCategories(houseNumber),
       nakshatra: nakshatraName || 'Ashwini',
-      nakshatraNumber: nakshatraNum || 1,
-      nakshatraLord: '—',
+      nakshatraNumber: finalNakNum,
+      nakshatraLord,
       pada: pada || 1,
       dignity,
-      lordOfHouses: p.lord_of_houses || [],
+      lordOfHouses,
       dispositor,
       sunSeparation: p.sun_separation,
+      naturalKaraka,
+      aspectsCast: [],
+      aspectsReceived: [],
     })
+  }
+
+  // 1b. Compute Jaimini 7-Karaka Chara Karakas
+  const classicalGrahas = planets.filter((pl) =>
+    ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn'].includes(pl.name)
+  )
+  classicalGrahas.sort((a, b) => b.degreeInSign - a.degreeInSign)
+  const charaRoles = [
+    { code: 'AK', name: 'Atmakaraka (AK)' },
+    { code: 'AmK', name: 'Amatyakaraka (AmK)' },
+    { code: 'BK', name: 'Bhratrikaraka (BK)' },
+    { code: 'MK', name: 'Matrikaraka (MK)' },
+    { code: 'PK', name: 'Putrakaraka (PK)' },
+    { code: 'GK', name: 'Gnatikaraka (GK)' },
+    { code: 'DK', name: 'Darakaraka (DK)' },
+  ]
+  classicalGrahas.forEach((pl, idx) => {
+    if (charaRoles[idx]) {
+      pl.charaKarakaCode = charaRoles[idx].code
+      pl.charaKaraka = charaRoles[idx].name
+    }
+  })
+
+  // 1c. Compute Functional Role by Lagna
+  for (const pl of planets) {
+    const rKendra = pl.lordOfHouses.some((h) => [1, 4, 7, 10].includes(h))
+    const rTrikona = pl.lordOfHouses.some((h) => [5, 9].includes(h))
+    const rDusthana = pl.lordOfHouses.some((h) => [6, 8, 12].includes(h))
+    const rMaraka = pl.lordOfHouses.some((h) => [2, 7].includes(h))
+    const rLagna = pl.lordOfHouses.includes(1)
+
+    if (rKendra && rTrikona) {
+      pl.functionalType = 'Yogakaraka'
+      pl.functionalRole = `Yogakaraka (${pl.lordOfHouses.map(getOrdinal).join(' & ')} Lord) • Auspicious Raja Yoga producer for this Ascendant`
+    } else if (rLagna) {
+      pl.functionalType = 'Lagna Lord'
+      pl.functionalRole = `Lagna Lord (${pl.lordOfHouses.map(getOrdinal).join(' & ')} Lord) • Prime guardian of life force, constitution, and self`
+    } else if (rTrikona) {
+      pl.functionalType = 'Functional Benefic'
+      pl.functionalRole = `Functional Benefic (${pl.lordOfHouses.map(getOrdinal).join(' & ')} Lord) • Auspicious Trikona lord blessing fortune and merit`
+    } else if (rDusthana && !rLagna) {
+      pl.functionalType = 'Functional Malefic'
+      pl.functionalRole = `Functional Malefic (${pl.lordOfHouses.map(getOrdinal).join(' & ')} Lord) • Dusthana lord bringing karmic tests and growth through effort`
+    } else if (rMaraka) {
+      pl.functionalType = 'Maraka'
+      pl.functionalRole = `Maraka Lord (${pl.lordOfHouses.map(getOrdinal).join(' & ')} Lord) • Signifies alliances, worldly resources, and major life transitions`
+    } else if (pl.name === 'Rahu' || pl.name === 'Ketu') {
+      pl.functionalType = 'Neutral'
+      pl.functionalRole = `Karmic Node (in ${pl.houseOrdinal} House) • Operates through dispositor ${pl.dispositor}`
+    } else {
+      pl.functionalType = 'Neutral'
+      pl.functionalRole = `Functional Neutral (${pl.lordOfHouses.map(getOrdinal).join(' & ')} Lord)`
+    }
+  }
+
+  // 1d. Compute Parashari Drishti (Aspects Cast & Received)
+  for (const pl of planets) {
+    const aspectsList: { targetH: number; type: string }[] = []
+    // 7th full aspect for all planets
+    aspectsList.push({ targetH: ((pl.houseNumber + 6 - 1) % 12) + 1, type: '7th Aspect (Full Opposition)' })
+
+    if (pl.name === 'Mars') {
+      aspectsList.push({ targetH: ((pl.houseNumber + 3 - 1) % 12) + 1, type: '4th Special Aspect (Square)' })
+      aspectsList.push({ targetH: ((pl.houseNumber + 7 - 1) % 12) + 1, type: '8th Special Aspect' })
+    } else if (pl.name === 'Jupiter' || pl.name === 'Rahu' || pl.name === 'Ketu') {
+      aspectsList.push({ targetH: ((pl.houseNumber + 4 - 1) % 12) + 1, type: '5th Special Aspect (Trine)' })
+      aspectsList.push({ targetH: ((pl.houseNumber + 8 - 1) % 12) + 1, type: '9th Special Aspect (Trine)' })
+    } else if (pl.name === 'Saturn') {
+      aspectsList.push({ targetH: ((pl.houseNumber + 2 - 1) % 12) + 1, type: '3rd Special Aspect (Sextile)' })
+      aspectsList.push({ targetH: ((pl.houseNumber + 9 - 1) % 12) + 1, type: '10th Special Aspect (Square)' })
+    }
+
+    for (const asp of aspectsList) {
+      const targetSignIdx = (lagnaSignIndex + (asp.targetH - 1)) % 12
+      const targetSignName = SIGN_NAMES[targetSignIdx]
+      const residentPlanets = planets.filter((o) => o.houseNumber === asp.targetH).map((o) => o.name)
+
+      pl.aspectsCast?.push({
+        house: asp.targetH,
+        houseOrdinal: getOrdinal(asp.targetH),
+        sign: targetSignName,
+        type: asp.type,
+        aspectedPlanets: residentPlanets,
+      })
+
+      // Add to aspectsReceived of resident planets
+      for (const resPl of planets.filter((o) => o.houseNumber === asp.targetH)) {
+        resPl.aspectsReceived?.push({
+          planet: pl.name,
+          type: asp.type,
+        })
+      }
+    }
   }
 
   // 2. Process Houses
@@ -232,19 +456,40 @@ export function normalizeChartPayload(computed: any): AstroChart {
   for (let h = 1; h <= 12; h++) {
     const signIndex = (lagnaSignIndex + (h - 1)) % 12
     const signName = SIGN_NAMES[signIndex]
-    const lord = SIGN_LORDS[signName]
+    const lord = SIGN_LORDS[signName] || '—'
     const occupants = planets.filter((p) => p.houseNumber === h).map((p) => p.name)
     const rawBhava = (rawRasi?.bhavas || []).find((b: any) => b.house === h)
+    const lordPlanet = planets.find((p) => p.name === lord)
+
+    const houseAspectsReceived: { planet: string; type: string }[] = []
+    for (const pl of planets) {
+      const match = pl.aspectsCast?.find((a) => a.house === h)
+      if (match) {
+        houseAspectsReceived.push({ planet: pl.name, type: match.type })
+      }
+    }
+
+    const meta = HOUSE_METADATA[h]
 
     houses.push({
       number: h,
       name: `${getOrdinal(h)} House${h === 1 ? ' (Lagna)' : ''}`,
+      sanskritName: meta?.sanskrit,
       sign: signName,
       signNumber: signIndex + 1,
       signIndex,
       lord,
+      lordHouseNumber: lordPlanet?.houseNumber,
+      lordHouseOrdinal: lordPlanet?.houseOrdinal,
+      lordSign: lordPlanet?.sign,
+      lordDignity: lordPlanet?.dignity,
+      naturalKaraka: meta?.karaka,
       occupants,
-      aspectsReceived: [],
+      aspectsReceived: houseAspectsReceived,
+      bhavatBhavam: meta?.bhavatBhavam,
+      significations: meta?.significations,
+      purushartha: meta?.purushartha,
+      classificationTags: deriveHouseCategories(h),
       startLongitude: rawBhava?.start,
       cuspLongitude: rawBhava?.middle,
       endLongitude: rawBhava?.end,
