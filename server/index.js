@@ -51,7 +51,7 @@ async function horaFetch(urlPath, body) {
 }
 
 /** Build a unified chart payload from multiple Hora API responses. */
-function buildChartPayload(name, birthData, rasi, panchanga, dasha, vargaCatalog) {
+function buildChartPayload(name, birthData, rasi, panchanga, dasha, vargaCatalog, shodasavarga, aspects) {
   const ordinal = (n) => {
     const r = n % 100
     if (r >= 11 && r <= 13) return `${n}th`
@@ -68,6 +68,23 @@ function buildChartPayload(name, birthData, rasi, panchanga, dasha, vargaCatalog
     retrograde: Boolean(p.retrograde),
     combust: Boolean(p.combust),
     status: p.dignity || 'Calculated',
+    // Rich astronomical properties
+    id: p.id,
+    longitude: p.longitude,
+    latitude: p.latitude,
+    speed: p.speed,
+    degrees_in_rasi: p.degrees_in_rasi,
+    dms: p.dms,
+    sign_dm: p.sign_dm,
+    rasi_dm: p.rasi_dm,
+    rasi_index: p.rasi,
+    nakshatra_number: p.nakshatra,
+    nakshatra_name: p.nakshatra_name,
+    pada: p.pada,
+    house_labels: p.house_labels || [],
+    dignity: p.dignity,
+    sun_separation: p.sun_separation,
+    lord_of_houses: p.lord_of_houses || [],
   }))
 
   const houses = (rasi?.bhavas || []).map((b) => ({
@@ -76,6 +93,10 @@ function buildChartPayload(name, birthData, rasi, panchanga, dasha, vargaCatalog
     sign: b.rasi_name,
     lord: '—',
     occupants: planets.filter((p) => p.houseNumber === b.house).map((p) => p.name),
+    start: b.start,
+    middle: b.middle,
+    end: b.end,
+    rasi_index: b.rasi,
   }))
 
   const lagna = rasi?.lagna
@@ -107,21 +128,29 @@ function buildChartPayload(name, birthData, rasi, panchanga, dasha, vargaCatalog
     calculationSettings: `${rasi?.settings?.ayanamsa || 'Unknown'} ayanamsha • ${rasi?.settings?.house_system || 'Unknown'} houses`,
     planets,
     houses,
-    vargas: (vargaCatalog?.named || []).slice(0, 5).map((v) => ({
+    vargas: (vargaCatalog?.named || []).map((v) => ({
       code: v.code,
       title: v.name,
       purpose: `${v.divisions} divisions`,
-      status: 'Available',
+      divisions: v.divisions,
+      status: shodasavarga?.charts?.[v.code] ? 'Calculated' : 'Available',
     })),
-    dashas: (dasha?.periods || []).slice(0, 3).map((d, i) => ({
+    dashas: (dasha?.periods || []).slice(0, 9).map((d, i) => ({
       period: d.lord_name,
-      label: ['Mahadasha', 'Antardasha', 'Pratyantardasha'][i] || 'Period',
+      label: 'Mahadasha',
       start: d.start,
       end: d.end,
-      color: ['#c9a66b', '#7ec8c9', '#ed9e7a'][i % 3],
+      color: ['#c9a66b', '#7ec8c9', '#ed9e7a', '#a67ec9', '#c97e93', '#7ec98a', '#d4b483', '#5a9bc9', '#c9917e'][i % 9],
+      children: d.children || [],
     })),
     source: `${panchanga?.date_local || 'Hora'} • ${panchanga?.tithi?.[0]?.name || 'Panchanga'}`,
     birthData,
+    // Deep technical payloads from the Hora Calculation API
+    rawRasi: rasi,
+    rawPanchanga: panchanga,
+    rawDasha: dasha,
+    shodasavarga: shodasavarga?.charts || null,
+    aspects: aspects || null,
   }
 }
 
@@ -167,7 +196,7 @@ app.use('/api/hora', async (req, res) => {
 
 /** Compute all chart components with graceful fallbacks for optional sub-calculations. */
 async function computeChart(name, birthData) {
-  const [rasiResult, panchangaResult, dashaResult, vargaResult] = await Promise.allSettled([
+  const [rasiResult, panchangaResult, dashaResult, vargaResult, shodasavargaResult] = await Promise.allSettled([
     horaFetch('/v1/chart/rasi', birthData),
     horaFetch('/v1/panchanga', birthData),
     horaFetch('/v1/dasha', {
@@ -179,6 +208,7 @@ async function computeChart(name, birthData) {
       as_of: new Date().toISOString(),
     }),
     horaFetch('/v1/chart/varga-catalog'),
+    horaFetch('/v1/chart/shodasavarga', birthData),
   ])
 
   if (rasiResult.status !== 'fulfilled') {
@@ -189,8 +219,25 @@ async function computeChart(name, birthData) {
   const panchanga = panchangaResult.status === 'fulfilled' ? panchangaResult.value : null
   const dasha = dashaResult.status === 'fulfilled' ? dashaResult.value : null
   const vargaCatalog = vargaResult.status === 'fulfilled' ? vargaResult.value : null
+  const shodasavarga = shodasavargaResult.status === 'fulfilled' ? shodasavargaResult.value : null
 
-  return buildChartPayload(name, birthData, rasi, panchanga, dasha, vargaCatalog)
+  // Fetch aspects if rasi succeeded
+  let aspects = null
+  try {
+    const rasisMap = {}
+    for (const g of rasi.grahas || []) {
+      rasisMap[g.id] = g.rasi
+    }
+    aspects = await horaFetch('/v1/aspect/chart', {
+      rasis: rasisMap,
+      lagna_rasi: rasi.lagna?.rasi ?? 0,
+      rahu_ketu_aspects: false,
+    })
+  } catch (err) {
+    // Aspects can be calculated client-side in adapter if endpoint fails
+  }
+
+  return buildChartPayload(name, birthData, rasi, panchanga, dasha, vargaCatalog, shodasavarga, aspects)
 }
 
 // ---------------------------------------------------------------------------

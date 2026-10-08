@@ -1,92 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import './App.css'
+import type { AstroChart, BirthData } from './types/astro'
+import { normalizeChartPayload } from './adapters/horaAdapter'
+import { VedicChart } from './components/chart/VedicChart'
+import { UniversalInspector } from './components/inspector/UniversalInspector'
+import { VargaWorkspace } from './components/vargas/VargaWorkspace'
+import { DashaTimeline } from './components/timing/DashaTimeline'
 
 // ---------------------------------------------------------------------------
-// Types
+// Types & Constants
 // ---------------------------------------------------------------------------
 
 type NavKey = 'Overview' | 'Charts' | 'Timing' | 'Analysis' | 'Research' | 'Learn'
-
-type Planet = {
-  name: string
-  sign: string
-  degree: string
-  nakshatra: string
-  house: string
-  houseNumber: number
-  retrograde?: boolean
-  combust: boolean
-  status: string
-}
-
-type House = {
-  number: number
-  name: string
-  sign: string
-  lord: string
-  occupants: string[]
-}
-
-type Varga = {
-  code: string
-  title: string
-  purpose: string
-  status: string
-}
-
-type DashaSegment = {
-  period: string
-  label: string
-  start: string
-  end: string
-  color: string
-}
-
-type BirthData = {
-  name?: string
-  year: number
-  month: number
-  day: number
-  hour: number
-  minute: number
-  second?: number
-  tz_name: string
-  utc_offset_hours?: number
-  place: {
-    latitude: number
-    longitude: number
-    altitude?: number
-    name: string
-  }
-}
-
-type Chart = {
-  id: number
-  name: string
-  date: string
-  time: string
-  location: string
-  latitude: string
-  longitude: string
-  timezone: string
-  lagna: string
-  moon: string
-  moonNakshatra: string
-  sunSign: string
-  currentMahadasha: string
-  ayanamsa: string
-  calculationSettings: string
-  planets: Planet[]
-  houses: House[]
-  vargas: Varga[]
-  dashas: DashaSegment[]
-  source: string
-  birthData?: BirthData
-}
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
 
 const navItems: NavKey[] = ['Overview', 'Charts', 'Timing', 'Analysis', 'Research', 'Learn']
 
@@ -104,61 +29,6 @@ const DEFAULT_BIRTH: BirthData = {
     longitude: 78.0081,
     name: 'Agra',
   },
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-const formatDisplayDate = (iso: string | undefined) => {
-  if (!iso) return '—'
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return iso
-  return date.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
-}
-
-const formatDisplayTime = (iso: string | undefined) => {
-  if (!iso) return '—'
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return iso
-  return date.toLocaleTimeString('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
-function formatChartPayload(computed: any): Chart {
-  return {
-    id: computed.id ?? 0,
-    name: computed.name ?? 'Live chart',
-    date: formatDisplayDate(computed.date || (computed.birthData ? `${computed.birthData.year}-${String(computed.birthData.month).padStart(2, '0')}-${String(computed.birthData.day).padStart(2, '0')}` : undefined)),
-    time: formatDisplayTime(computed.time || (computed.birthData ? `${String(computed.birthData.hour).padStart(2, '0')}:${String(computed.birthData.minute).padStart(2, '0')}` : undefined)),
-    location: computed.location ?? computed.birthData?.place?.name ?? 'Agra',
-    latitude: computed.latitude ?? (computed.birthData?.place?.latitude !== undefined ? `${computed.birthData.place.latitude}°` : '27.1767°'),
-    longitude: computed.longitude ?? (computed.birthData?.place?.longitude !== undefined ? `${computed.birthData.place.longitude}°` : '78.0081°'),
-    timezone: computed.timezone ?? computed.birthData?.tz_name ?? 'Asia/Kolkata',
-    lagna: computed.lagna ?? 'Unavailable',
-    moon: computed.moon ?? 'Unavailable',
-    moonNakshatra: computed.moonNakshatra ?? 'Unavailable',
-    sunSign: computed.sunSign ?? 'Unavailable',
-    currentMahadasha: computed.currentMahadasha ?? 'Unavailable',
-    ayanamsa: computed.ayanamsa ?? 'Unavailable',
-    calculationSettings: computed.calculationSettings ?? 'Unknown',
-    planets: computed.planets ?? [],
-    houses: computed.houses ?? [],
-    vargas: computed.vargas ?? [],
-    dashas: (computed.dashas ?? []).map((d: DashaSegment) => ({
-      ...d,
-      start: formatDisplayDate(d.start),
-      end: formatDisplayDate(d.end),
-    })),
-    source: computed.source ?? 'Hora Engine',
-    birthData: computed.birthData,
-  }
 }
 
 async function fetchJsonWithRetry(path: string, init?: RequestInit) {
@@ -212,7 +82,7 @@ function CreateChartModal({
   onCreated,
 }: {
   onClose: () => void
-  onCreated: (chart: Chart) => void
+  onCreated: (chart: any) => void
 }) {
   const [form, setForm] = useState<BirthData>({
     name: '',
@@ -698,9 +568,11 @@ function CreateChartModal({
 
 function App() {
   const [selectedNav, setSelectedNav] = useState<NavKey>('Overview')
-  const [selectedPlanet, setSelectedPlanet] = useState('')
-  const [chart, setChart] = useState<Chart | null>(null)
-  const [savedCharts, setSavedCharts] = useState<Chart[]>([])
+  const [selectedPlanet, setSelectedPlanet] = useState<string>('Sun')
+  const [selectedHouse, setSelectedHouse] = useState<number>(1)
+  const [inspectorTab, setInspectorTab] = useState<'planet' | 'house'>('planet')
+  const [chart, setChart] = useState<AstroChart | null>(null)
+  const [savedCharts, setSavedCharts] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -721,9 +593,10 @@ function App() {
 
   // Apply a chart to active state and persist selection
   const applyChart = (targetChart: any) => {
-    const formatted = formatChartPayload(targetChart)
-    setChart(formatted)
-    setSelectedPlanet(formatted.planets[0]?.name ?? '')
+    const normalized = normalizeChartPayload(targetChart)
+    setChart(normalized)
+    setSelectedPlanet(normalized.planets[0]?.name ?? 'Sun')
+    setSelectedHouse(1)
     if (targetChart.id) {
       localStorage.setItem('hora_active_chart_id', String(targetChart.id))
     }
@@ -790,20 +663,6 @@ function App() {
     } finally {
       setLoading(false)
     }
-  }
-
-  const activePlanet = useMemo(
-    () => chart?.planets.find((planet) => planet.name === selectedPlanet) ?? chart?.planets[0] ?? null,
-    [chart, selectedPlanet],
-  )
-
-  const activePlanetDetail = activePlanet ?? {
-    name: 'Unavailable',
-    sign: '—',
-    degree: '—',
-    nakshatra: '—',
-    house: '—',
-    status: 'Awaiting chart',
   }
 
   if (error) {
@@ -917,23 +776,23 @@ function App() {
         <section className="summary-grid">
           <article className="summary-card panel">
             <p className="eyebrow">Lagna</p>
-            <strong>{chart.lagna}</strong>
-            <span>Ascendant</span>
+            <strong>{chart.quickFacts.lagna}</strong>
+            <span>Ascendant ({chart.quickFacts.lagnaDms})</span>
           </article>
           <article className="summary-card panel">
             <p className="eyebrow">Moon</p>
-            <strong>{chart.moon}</strong>
-            <span>{chart.moonNakshatra}</span>
+            <strong>{chart.quickFacts.moonSign}</strong>
+            <span>{chart.quickFacts.moonNakshatra}</span>
           </article>
           <article className="summary-card panel">
             <p className="eyebrow">Current Dasha</p>
-            <strong>{chart.currentMahadasha}</strong>
-            <span>Vimshottari</span>
+            <strong>{chart.quickFacts.currentMahadasha}</strong>
+            <span>{chart.quickFacts.currentAntardasha ? `AD: ${chart.quickFacts.currentAntardasha}` : 'Vimshottari'}</span>
           </article>
           <article className="summary-card panel">
-            <p className="eyebrow">Source</p>
-            <strong>{chart.source}</strong>
-            <span>{loading ? 'Refreshing' : 'Ready'}</span>
+            <p className="eyebrow">Ayanamsha</p>
+            <strong>{chart.metadata.ayanamsaName}</strong>
+            <span>{chart.metadata.ayanamsaDms}</span>
           </article>
         </section>
 
@@ -943,46 +802,59 @@ function App() {
               <div className="section-heading">
                 <div>
                   <p className="eyebrow">Birth information</p>
-                  <h3>{chart.date}</h3>
+                  <h3>{chart.metadata.dateFormatted}</h3>
                 </div>
                 <div className="meta-block">
-                  <span>{chart.time}</span>
-                  <span>{chart.location}</span>
-                  <span>{chart.timezone}</span>
+                  <span>{chart.metadata.timeFormatted}</span>
+                  <span>{chart.metadata.location}</span>
+                  <span>{chart.metadata.timezone}</span>
                 </div>
               </div>
 
               <div className="chart-layout">
-                <div className="chart-board">
-                  <div className="chart-grid">
-                    {chart.houses.map((house) => (
-                      <div key={house.number} className="chart-cell">
-                        <span className="cell-sign">House {house.number} · {house.sign}</span>
-                        <strong>{house.occupants.length ? house.occupants.join(', ') : '—'}</strong>
-                        <small>{house.number === 1 ? 'Lagna' : 'House occupants'}</small>
-                      </div>
-                    ))}
-                  </div>
+                <div className="chart-board" style={{ padding: 0, background: 'transparent', border: 'none' }}>
+                  <VedicChart
+                    chart={chart}
+                    selectedPlanet={selectedPlanet}
+                    selectedHouse={selectedHouse}
+                    defaultStyle="north"
+                    onSelectPlanet={(pName) => {
+                      setSelectedPlanet(pName)
+                      setInspectorTab('planet')
+                    }}
+                    onSelectHouse={(hNum) => {
+                      setSelectedHouse(hNum)
+                      setInspectorTab('house')
+                    }}
+                  />
                 </div>
 
                 <div className="facts-column">
                   <div className="facts-box">
                     <p className="eyebrow">Quick facts</p>
                     <ul>
-                      <li><span>Ascendant</span><strong>{chart.lagna}</strong></li>
-                      <li><span>Moon sign</span><strong>{chart.moon.split(' ').slice(0, -1).join(' ')}</strong></li>
-                      <li><span>Sun sign</span><strong>{chart.sunSign}</strong></li>
-                      <li><span>Moon Nakshatra</span><strong>{chart.moonNakshatra}</strong></li>
+                      <li><span>Ascendant</span><strong>{chart.quickFacts.lagna} {chart.quickFacts.lagnaDms}</strong></li>
+                      <li><span>Moon sign</span><strong>{chart.quickFacts.moonSign}</strong></li>
+                      <li><span>Sun sign</span><strong>{chart.quickFacts.sunSign}</strong></li>
+                      <li><span>Moon Nakshatra</span><strong>{chart.quickFacts.moonNakshatra} (Pada {chart.quickFacts.moonPada})</strong></li>
+                      <li><span>Current Mahadasha</span><strong>{chart.quickFacts.currentMahadasha}</strong></li>
                     </ul>
                   </div>
                   <div className="facts-box">
                     <p className="eyebrow">Explore</p>
                     <div className="chip-grid">
-                      {['Houses', 'Planets', 'Nakshatras', 'Vargas', 'Dashas', 'Strength'].map((item) => (
-                        <button key={item} type="button" className="chip-button">
-                          {item}
-                        </button>
-                      ))}
+                      <button type="button" className={`chip-button ${inspectorTab === 'house' ? 'selected' : ''}`} onClick={() => setInspectorTab('house')}>
+                        Houses
+                      </button>
+                      <button type="button" className={`chip-button ${inspectorTab === 'planet' ? 'selected' : ''}`} onClick={() => setInspectorTab('planet')}>
+                        Planets
+                      </button>
+                      <button type="button" className="chip-button" onClick={() => setSelectedNav('Charts')}>
+                        Vargas
+                      </button>
+                      <button type="button" className="chip-button" onClick={() => setSelectedNav('Timing')}>
+                        Dashas
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -993,7 +865,7 @@ function App() {
               <div className="panel">
                 <div className="section-header">
                   <h3>Planetary positions</h3>
-                  <button type="button" className="text-button">View raw</button>
+                  <span className="eyebrow">9 Grahas + Lagna</span>
                 </div>
                 <table>
                   <thead>
@@ -1006,11 +878,23 @@ function App() {
                   </thead>
                   <tbody>
                     {chart.planets.map((planet) => (
-                      <tr key={planet.name} onClick={() => setSelectedPlanet(planet.name)}>
-                        <td>{planet.name}</td>
-                        <td>{planet.degree}</td>
+                      <tr
+                        key={planet.name}
+                        onClick={() => {
+                          setSelectedPlanet(planet.name)
+                          setInspectorTab('planet')
+                        }}
+                        style={{ cursor: 'pointer', background: selectedPlanet === planet.name ? 'rgba(217, 119, 6, 0.16)' : undefined }}
+                        title="Click to inspect this planet in the Object Inspector"
+                      >
+                        <td>
+                          <strong>{planet.name}</strong> <small style={{ color: '#94a3b8' }}>({planet.sanskritName})</small>
+                          {planet.retrograde && <span style={{ color: '#f59e0b', marginLeft: 4, fontWeight: 'bold' }}>[R]</span>}
+                          {planet.combust && <span style={{ color: '#ef4444', marginLeft: 2, fontWeight: 'bold' }}>*</span>}
+                        </td>
+                        <td>{planet.dms}</td>
                         <td>{planet.sign}</td>
-                        <td>{planet.house}</td>
+                        <td>{planet.houseOrdinal}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1020,17 +904,17 @@ function App() {
               <div className="panel">
                 <div className="section-header">
                   <h3>Vimshottari</h3>
-                  <button type="button" className="text-button">Timeline</button>
+                  <button type="button" className="text-button" onClick={() => setSelectedNav('Timing')}>Timeline →</button>
                 </div>
                 <div className="dasha-stack">
-                  {chart.dashas.map((dasha) => (
-                    <div key={dasha.period} className="dasha-item">
-                      <span className="dot" style={{ background: dasha.color }} />
+                  {chart.dashaTree.slice(0, 5).map((dasha: any, idx: number) => (
+                    <div key={dasha.lord || dasha.period || idx} className="dasha-item">
+                      <span className="dot" style={{ background: ['#c9a66b', '#7ec8c9', '#ed9e7a', '#a67ec9', '#7ec98a'][idx % 5] }} />
                       <div>
-                        <strong>{dasha.period}</strong>
-                        <small>{dasha.label}</small>
+                        <strong>{dasha.lord || dasha.period || dasha.lord_name}</strong>
+                        <small>Mahadasha</small>
                       </div>
-                      <span>{dasha.start}–{dasha.end}</span>
+                      <span>{dasha.start?.slice?.(0, 10) || '—'} → {dasha.end?.slice?.(0, 10) || '—'}</span>
                     </div>
                   ))}
                 </div>
@@ -1040,35 +924,25 @@ function App() {
         )}
 
         {selectedNav === 'Charts' && (
-          <section className="panel">
-            <div className="section-header">
-              <h3>Divisional charts</h3>
-              <div className="varga-selector">
-                {chart.vargas.map((varga) => (
-                  <button key={varga.code} type="button" className="chip-button selected">
-                    {varga.code}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="varga-layout">
-              {chart.vargas.map((varga) => (
-                <article key={varga.code} className="varga-card">
-                  <div className="varga-header">
-                    <strong>{varga.code}</strong>
-                    <span>{varga.status}</span>
-                  </div>
-                  <h4>{varga.title}</h4>
-                  <p>{varga.purpose}</p>
-                </article>
-              ))}
-            </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <VargaWorkspace
+              chart={chart}
+              selectedPlanet={selectedPlanet}
+              selectedHouse={selectedHouse}
+              onSelectPlanet={(pName) => {
+                setSelectedPlanet(pName)
+                setInspectorTab('planet')
+              }}
+              onSelectHouse={(hNum) => {
+                setSelectedHouse(hNum)
+                setInspectorTab('house')
+              }}
+            />
 
             {savedCharts.length > 0 && (
-              <>
-                <div className="section-header" style={{ marginTop: 24 }}>
-                  <h3>Saved charts</h3>
+              <section className="panel" style={{ marginTop: 8 }}>
+                <div className="section-header">
+                  <h3>Saved Charts Archive</h3>
                   <span className="eyebrow">{savedCharts.length} saved</span>
                 </div>
                 <div className="saved-charts-list">
@@ -1093,84 +967,37 @@ function App() {
                     )
                   })}
                 </div>
-              </>
+              </section>
             )}
-          </section>
+          </div>
         )}
 
         {selectedNav === 'Timing' && (
-          <section className="panel">
-            <div className="section-header">
-              <h3>Timing cycle</h3>
-              <button type="button" className="text-button">Current Mahadasha</button>
-            </div>
-            <div className="timeline">
-              {chart.dashas.map((dasha) => (
-                <div key={dasha.period} className="timeline-row">
-                  <div className="timeline-label">
-                    <span>{dasha.label}</span>
-                    <strong>{dasha.period}</strong>
-                  </div>
-                  <div className="timeline-bar">
-                    <span style={{ width: '65%', background: dasha.color }} />
-                  </div>
-                  <div className="timeline-range">{dasha.start} → {dasha.end}</div>
-                </div>
-              ))}
-            </div>
-          </section>
+          <DashaTimeline
+            chart={chart}
+            onSelectPlanet={(pName) => {
+              setSelectedPlanet(pName)
+              setInspectorTab('planet')
+            }}
+          />
         )}
       </main>
 
-      <aside className="inspector panel">
-        <div className="inspector-header">
-          <p className="eyebrow">Inspector</p>
-          <h3>Planet details</h3>
-        </div>
-
-        <div className="planet-summary">
-          <div className="planet-name-row">
-            <span className="planet-symbol">{activePlanetDetail.name.slice(0, 1)}</span>
-            <div>
-              <h4>{activePlanetDetail.name}</h4>
-              <small>{activePlanetDetail.sign}</small>
-            </div>
-          </div>
-          <p className="planet-degree">{activePlanetDetail.degree}</p>
-          <div className="planet-meta">
-            <span>{activePlanetDetail.house} house</span>
-            <span>{activePlanetDetail.nakshatra}</span>
-          </div>
-        </div>
-
-        <div className="inspector-section">
-          <p className="eyebrow">Basic</p>
-          <ul>
-            <li><span>Sign</span><strong>{activePlanetDetail.sign}</strong></li>
-            <li><span>Degree</span><strong>{activePlanetDetail.degree}</strong></li>
-            <li><span>House</span><strong>{activePlanetDetail.house}</strong></li>
-            <li><span>Status</span><strong>{activePlanetDetail.status}</strong></li>
-          </ul>
-        </div>
-
-        <div className="inspector-section">
-          <p className="eyebrow">Dignity</p>
-          <ul>
-            <li><span>Dignity</span><strong>{activePlanetDetail.status}</strong></li>
-            <li><span>Retrograde</span><strong>{activePlanet?.retrograde ? 'Yes' : 'No'}</strong></li>
-            <li><span>Combust</span><strong>{activePlanet?.combust ? 'Yes' : 'No'}</strong></li>
-          </ul>
-        </div>
-
-        <div className="inspector-section">
-          <p className="eyebrow">Calculation</p>
-          <ul>
-            <li><span>Longitude</span><strong>{activePlanetDetail.degree}</strong></li>
-            <li><span>Ayanamsha</span><strong>{chart.ayanamsa}</strong></li>
-            <li><span>Settings</span><strong>{chart.calculationSettings}</strong></li>
-          </ul>
-        </div>
-      </aside>
+      <UniversalInspector
+        chart={chart}
+        selectedPlanetName={selectedPlanet}
+        selectedHouseNumber={selectedHouse}
+        activeTab={inspectorTab}
+        onChangeTab={setInspectorTab}
+        onSelectPlanet={(pName) => {
+          setSelectedPlanet(pName)
+          setInspectorTab('planet')
+        }}
+        onSelectHouse={(hNum) => {
+          setSelectedHouse(hNum)
+          setInspectorTab('house')
+        }}
+      />
 
       {showCreateModal && (
         <CreateChartModal
