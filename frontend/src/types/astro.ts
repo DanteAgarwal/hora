@@ -109,7 +109,7 @@ export interface VargaChartData {
 
 export interface DashaPeriod {
   lord: string
-  level: number // 1 = Mahadasha, 2 = Antardasha, 3 = Pratyantardasha
+  level: number // 1 = Mahadasha, 2 = Antardasha, 3 = Pratyantardasha, 4 = Sookshma, 5 = Prana, 6 = Deha (Sub-Sookshma)
   start: string // ISO string or human formatted
   end: string
   startJd?: number

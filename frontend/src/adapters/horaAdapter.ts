@@ -453,10 +453,9 @@ export function calculateVargaSign(code: string, signIndex: number, degreeInSign
     }
 
     case 'D4': {
-      // Chaturthamsha (7°30'): Odd signs start from self; Even from 4th
+      // Chaturthamsha (7°30'): Parashari BPHS counts 4 kendras (1st, 4th, 7th, 10th from natal rasi)
       const part = Math.floor(degreeInSign / 7.5) // 0..3
-      const start = isOdd ? signIndex : (signIndex + 3) % 12
-      return (start + part * 3) % 12
+      return (signIndex + part * 3) % 12
     }
 
     case 'D7': {
@@ -514,15 +513,15 @@ export function calculateVargaSign(code: string, signIndex: number, degreeInSign
     }
 
     case 'D30': {
-      // Trimshamsha: Unequal division
-      // Odd signs: 0-5° Mars (0), 5-10° Saturn (10), 10-18° Jupiter (8), 18-25° Mercury (2), 25-30° Venus (1)
-      // Even signs: 0-5° Venus (1), 5-12° Mercury (5), 12-20° Jupiter (11), 20-25° Saturn (9), 25-30° Mars (7)
+      // Trimshamsha: Unequal division (BPHS / Jagannatha Hora)
+      // Odd signs: 0-5° Mars (0 Aries), 5-10° Saturn (10 Aquarius), 10-18° Jupiter (8 Sagittarius), 18-25° Mercury (2 Gemini), 25-30° Venus (6 Libra)
+      // Even signs: 0-5° Venus (1 Taurus), 5-12° Mercury (5 Virgo), 12-20° Jupiter (11 Pisces), 20-25° Saturn (9 Capricorn), 25-30° Mars (7 Scorpio)
       if (isOdd) {
         if (degreeInSign < 5) return 0 // Aries (Mars)
         if (degreeInSign < 10) return 10 // Aquarius (Saturn)
         if (degreeInSign < 18) return 8 // Sagittarius (Jupiter)
         if (degreeInSign < 25) return 2 // Gemini (Mercury)
-        return 1 // Taurus (Venus)
+        return 6 // Libra (Venus)
       } else {
         if (degreeInSign < 5) return 1 // Taurus (Venus)
         if (degreeInSign < 12) return 5 // Virgo (Mercury)
@@ -531,6 +530,7 @@ export function calculateVargaSign(code: string, signIndex: number, degreeInSign
         return 7 // Scorpio (Mars)
       }
     }
+
 
     case 'D40': {
       // Khavedamsha (0°45'): Odd from Aries(0); Even from Libra(6)
@@ -705,5 +705,64 @@ function resolveCurrentRunningDasha(dashaTree: DashaPeriod[]): string[] {
     }
   }
   return dashaTree[0] ? [dashaTree[0].lord] : []
+}
+
+/**
+ * Dynamically expands any dasha period into its 9 sub-periods down to Level 6:
+ * Level 1: Mahadasha (MD)
+ * Level 2: Antardasha (AD / Bhukti)
+ * Level 3: Pratyantardasha (PD)
+ * Level 4: Sookshma Dasha (SD)
+ * Level 5: Prana Dasha (PrD)
+ * Level 6: Deha Dasha (DD / Sub-Sookshma)
+ */
+export function expandDashaSubPeriods(parent: DashaPeriod, targetLevel: number = parent.level + 1): DashaPeriod[] {
+  if (targetLevel <= parent.level) return []
+
+  if (parent.children && parent.children.length === 9 && targetLevel === parent.level + 1) {
+    return parent.children
+  }
+
+  const startMs = new Date(parent.start).getTime()
+  const endMs = new Date(parent.end).getTime()
+  if (isNaN(startMs) || isNaN(endMs) || endMs <= startMs) return []
+
+  const spanMs = endMs - startMs
+  const parentLordClean = parent.lord.trim().toLowerCase()
+  let parentLordIdx = VIMSHOTTARI_CYCLE.findIndex(
+    (v) => v.name.toLowerCase() === parentLordClean
+  )
+  if (parentLordIdx < 0) parentLordIdx = 0
+
+  const nextLevel = parent.level + 1
+  const children: DashaPeriod[] = []
+  let cursor = startMs
+
+  for (let k = 0; k < 9; k++) {
+    const subIdx = (parentLordIdx + k) % 9
+    const subMeta = VIMSHOTTARI_CYCLE[subIdx]
+    const subFraction = subMeta.years / 120
+    const subSpanMs = spanMs * subFraction
+    const subStart = new Date(cursor)
+    const subEnd = new Date(cursor + subSpanMs)
+
+    const childNode: DashaPeriod = {
+      lord: subMeta.name,
+      level: nextLevel,
+      start: subStart.toISOString().replace('T', ' ').slice(0, nextLevel >= 5 ? 19 : nextLevel >= 4 ? 16 : 10),
+      end: subEnd.toISOString().replace('T', ' ').slice(0, nextLevel >= 5 ? 19 : nextLevel >= 4 ? 16 : 10),
+      durationDays: subSpanMs / (24 * 3600 * 1000),
+      children: [],
+    }
+
+    if (nextLevel < targetLevel) {
+      childNode.children = expandDashaSubPeriods(childNode, targetLevel)
+    }
+
+    children.push(childNode)
+    cursor += subSpanMs
+  }
+
+  return children
 }
 
