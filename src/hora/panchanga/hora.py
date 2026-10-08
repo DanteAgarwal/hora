@@ -41,7 +41,7 @@ def hora_at(jd_ut: float, sunrise: float, next_sunrise: float, vaara: int) -> Ho
     """The hora running at an instant."""
     span = (next_sunrise - sunrise) / 24.0
     elapsed = jd_ut - sunrise
-    index = min(int(elapsed // span) + 1, 24)
+    index = max(1, min(int(elapsed // span) + 1, 24))
     lord = hora_lord(vaara, index)
     start = sunrise + (index - 1) * span
     return Hora(index=index, lord=lord, lord_name=GRAHA_NAMES[lord],

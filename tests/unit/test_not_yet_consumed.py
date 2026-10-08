@@ -56,7 +56,7 @@ def _tracked() -> list[str]:
     for path in sorted(CONSTANTS_DIR.glob("*.py")):
         if path.name == "__init__.py":
             continue
-        names.update(_CONSTANT.findall(path.read_text()))
+        names.update(_CONSTANT.findall(path.read_text(encoding="utf-8")))
     return sorted(names)
 
 
@@ -65,12 +65,12 @@ TRACKED = _tracked()
 
 def _source_files():
     for path in SRC.rglob("*.py"):
-        rel = str(path.relative_to(SRC))
+        rel = path.relative_to(SRC).as_posix()
         if "__pycache__" in rel or rel in EXPOSERS:
             continue
         if rel.startswith(EXPOSER_PREFIXES):
             continue
-        yield rel, path.read_text()
+        yield rel, path.read_text(encoding="utf-8")
 
 
 def consumers(symbol: str) -> list[str]:
@@ -80,7 +80,7 @@ def consumers(symbol: str) -> list[str]:
 
 @pytest.fixture(scope="module")
 def register_text():
-    return REGISTER.read_text()
+    return REGISTER.read_text(encoding="utf-8")
 
 
 @pytest.mark.parametrize("symbol", TRACKED)
@@ -105,7 +105,7 @@ def test_the_register_does_not_list_something_that_is_now_consumed(symbol, regis
 
 def test_the_register_exists_and_names_its_own_test():
     assert REGISTER.is_file()
-    assert "test_not_yet_consumed.py" in REGISTER.read_text()
+    assert "test_not_yet_consumed.py" in REGISTER.read_text(encoding="utf-8")
 
 
 def test_only_rasi_drishti_is_used_from_the_aspects_module(register_text):

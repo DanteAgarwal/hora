@@ -160,7 +160,7 @@ def test_no_chart_or_figure_is_called_missing_when_we_have_it():
     fixtures: set[str] = set()
     for path in (root / "tests").rglob("*.py"):
         fixtures |= set(re.findall(r"^(CHART_\d+|RAMA_GRAHAS)\s*=",
-                                   path.read_text(), re.MULTILINE))
+                                   path.read_text(encoding="utf-8"), re.MULTILINE))
 
     problems = []
     for folder in ("docs", "tests", "src"):
@@ -169,7 +169,7 @@ def test_no_chart_or_figure_is_called_missing_when_we_have_it():
                 continue
             if path.name == Path(__file__).name:
                 continue
-            for kind, number, _, _ in claim.findall(path.read_text()):
+            for kind, number, _, _ in claim.findall(path.read_text(encoding="utf-8", errors="ignore")):
                 if f"CHART_{number}" in fixtures:
                     problems.append(
                         f"{path.relative_to(root)} says {kind} {number} is "

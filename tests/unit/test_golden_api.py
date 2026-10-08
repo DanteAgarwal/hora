@@ -29,7 +29,7 @@ def _load(case_id: str):
         pytest.fail(
             f"no golden fixture for {case_id!r} — run scripts/capture_golden.py"
         )
-    return json.loads(path.read_text())
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _diff(expected, actual, path=""):

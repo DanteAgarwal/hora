@@ -36,7 +36,7 @@ def _reference_paths(paths: list[str]) -> list[str]:
 
 
 def _published_names() -> list[str]:
-    text = REGISTER.read_text()
+    text = REGISTER.read_text(encoding="utf-8")
     start = text.index(PUBLISHED_SECTION)
     end = text.index("###", start + len(PUBLISHED_SECTION))
     return re.findall(r"`([A-Z][A-Z0-9_]+)`", text[start:end])
