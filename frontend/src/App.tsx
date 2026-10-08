@@ -6,6 +6,9 @@ import { VedicChart } from './components/chart/VedicChart'
 import { UniversalInspector } from './components/inspector/UniversalInspector'
 import { VargaWorkspace } from './components/vargas/VargaWorkspace'
 import { DashaTimeline } from './components/timing/DashaTimeline'
+import { AnalysisWorkspace } from './components/analysis/AnalysisWorkspace'
+import { ResearchWorkspace } from './components/research/ResearchWorkspace'
+import type { CalculationSettingsConfig } from './components/research/ConfigurationPanel'
 
 // ---------------------------------------------------------------------------
 // Types & Constants
@@ -666,6 +669,43 @@ function App() {
     }
   }
 
+  // Recalculate chart with updated engine calculation parameters (PRD §20)
+  const handleApplySettings = async (newSettings: CalculationSettingsConfig) => {
+    if (!chart) return
+    const birth = chart.birthData || DEFAULT_BIRTH
+    try {
+      setLoading(true)
+      const requestPayload = {
+        ...birth,
+        settings: {
+          ayanamsa: newSettings.ayanamsa,
+          house_system: newSettings.house_system,
+          node_type: newSettings.node_type,
+          topocentric: newSettings.topocentric,
+          apparent_positions: newSettings.apparent_positions,
+          sunrise_mode: newSettings.sunrise_mode,
+          dasha_year_length: newSettings.dasha_year_length,
+        },
+      }
+      const computed = await fetchJsonWithRetry('/api/compute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestPayload),
+      })
+      applyChart({
+        ...computed,
+        id: chart.id,
+        name: chart.name,
+        birthData: { ...birth, settings: requestPayload.settings },
+      })
+    } catch (e) {
+      console.error('Failed to recalculate with settings:', e)
+      throw e
+    } finally {
+      setLoading(false)
+    }
+  }
+
   if (error) {
     return (
       <div className="app-shell app-error">
@@ -723,7 +763,7 @@ function App() {
             >
               <span>{item}</span>
               <span className="nav-count">
-                {item === 'Overview' ? '01' : item === 'Charts' ? String(savedCharts.length).padStart(2, '0') : '—'}
+                {item === 'Overview' ? '01' : item === 'Charts' ? String(savedCharts.length).padStart(2, '0') : item === 'Analysis' ? '04' : item === 'Research' ? '03' : '—'}
               </span>
             </button>
           ))}
@@ -1264,6 +1304,36 @@ function App() {
               setSelectedPlanet(pName)
               setInspectorTab('planet')
             }}
+          />
+        )}
+
+        {selectedNav === 'Analysis' && (
+          <AnalysisWorkspace
+            chart={chart}
+            onSelectPlanet={(pName) => {
+              setSelectedPlanet(pName)
+              setInspectorTab('planet')
+            }}
+            onSelectHouse={(hNum) => {
+              setSelectedHouse(hNum)
+              setInspectorTab('house')
+            }}
+          />
+        )}
+
+        {selectedNav === 'Research' && (
+          <ResearchWorkspace
+            chart={chart}
+            onSelectPlanet={(pName) => {
+              setSelectedPlanet(pName)
+              setInspectorTab('planet')
+            }}
+            onSelectHouse={(hNum) => {
+              setSelectedHouse(hNum)
+              setInspectorTab('house')
+            }}
+            onApplySettings={handleApplySettings}
+            isRecalculating={loading}
           />
         )}
       </main>

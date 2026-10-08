@@ -51,7 +51,7 @@ async function horaFetch(urlPath, body) {
 }
 
 /** Build a unified chart payload from multiple Hora API responses. */
-function buildChartPayload(name, birthData, rasi, panchanga, dasha, vargaCatalog, shodasavarga, aspects) {
+function buildChartPayload(name, birthData, rasi, panchanga, dasha, vargaCatalog, shodasavarga, aspects, yogas) {
   const ordinal = (n) => {
     const r = n % 100
     if (r >= 11 && r <= 13) return `${n}th`
@@ -165,6 +165,7 @@ function buildChartPayload(name, birthData, rasi, panchanga, dasha, vargaCatalog
     rawDasha: dasha,
     shodasavarga: shodasavarga?.charts || null,
     aspects: aspects || null,
+    yogas: yogas || null,
   }
 }
 
@@ -245,13 +246,29 @@ async function computeChart(name, birthData) {
     aspects = await horaFetch('/v1/aspect/chart', {
       rasis: rasisMap,
       lagna_rasi: rasi.lagna?.rasi ?? 0,
-      rahu_ketu_aspects: false,
+      rahu_ketu_aspects: true,
     })
   } catch (err) {
     // Aspects can be calculated client-side in adapter if endpoint fails
   }
 
-  return buildChartPayload(name, birthData, rasi, panchanga, dasha, vargaCatalog, shodasavarga, aspects)
+  // Fetch yogas if rasi succeeded
+  let yogas = null
+  try {
+    const rasisMap = {}
+    for (const g of rasi.grahas || []) {
+      rasisMap[g.id] = g.rasi
+    }
+    yogas = await horaFetch('/v1/planetary-yoga/chart', {
+      rasis: rasisMap,
+      lagna_rasi: rasi.lagna?.rasi ?? 0,
+      include_nodes: true,
+    })
+  } catch (err) {
+    // Yogas can be calculated client-side in adapter if endpoint fails
+  }
+
+  return buildChartPayload(name, birthData, rasi, panchanga, dasha, vargaCatalog, shodasavarga, aspects, yogas)
 }
 
 // ---------------------------------------------------------------------------

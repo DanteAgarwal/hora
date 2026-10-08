@@ -182,6 +182,20 @@ export interface QuickFacts {
   currentPratyantardasha?: string
 }
 
+export interface PlanetaryYoga {
+  key: string
+  name: string
+  sanskritName?: string
+  group: 'Raja' | 'Dhana' | 'Mahapurusha' | 'Chandra' | 'Ravi' | 'Nabhasa' | 'Vipareeta' | 'General' | 'Other'
+  definition: string
+  effects?: string
+  present: boolean
+  strength?: 'High' | 'Medium' | 'Low' | 'Killed by Kemadruma'
+  participants: string[]
+  housesInvolved?: number[]
+  reason?: string
+}
+
 export interface AstroChart {
   id: number
   name: string
@@ -195,6 +209,7 @@ export interface AstroChart {
   runningDasha: string[]
   panchanga?: PanchangaData
   aspects?: any
+  yogas?: PlanetaryYoga[]
   raw?: any
 }
 
