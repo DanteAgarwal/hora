@@ -121,6 +121,29 @@ def _sub_periods(
     return out
 
 
+def expand_sub_periods(
+    spec: NakshatraDashaSpec,
+    parent_lord: int | str,
+    start_jd: float,
+    end_jd: float,
+    parent_level: int = 1,
+    target_level: int = 2,
+) -> list[DashaPeriod]:
+    """Expand a dasha period into its sub-periods down to target_level."""
+    if isinstance(parent_lord, str):
+        clean = parent_lord.strip().lower()
+        lord_id = next((g for g in spec.order if GRAHA_NAMES[g].lower() == clean), None)
+        if lord_id is None:
+            lord_id = next((k for k, v in GRAHA_NAMES.items() if str(v).lower() == clean), spec.order[0])
+    else:
+        lord_id = int(parent_lord)
+
+    span_days = end_jd - start_jd
+    if span_days <= 0 or target_level <= parent_level:
+        return []
+    return _sub_periods(spec, lord_id, start_jd, span_days, parent_level + 1, target_level)
+
+
 def compute_nakshatra_dasha(
     spec: NakshatraDashaSpec,
     moon_longitude: float,

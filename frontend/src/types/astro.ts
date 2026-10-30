@@ -196,6 +196,20 @@ export interface PlanetaryYoga {
   reason?: string
 }
 
+export type CompoundFriendship = 'Adhi-Mitra' | 'Mitra' | 'Sama' | 'Shatru' | 'Adhi-Shatru'
+
+export interface SambhandhaResult {
+  distFromAtoB: number // 1 to 12
+  distFromBtoA: number // 1 to 12
+  axisLabel: string // e.g. '5/9 (Nava-Panchama)', '6/8 (Shadashtaka)'
+  category: 'Auspicious' | 'Favorable Growth' | 'Dynamic Action' | 'Challenging Friction' | 'Expenditure & Shift' | 'Conjunction' | 'Mutual Aspect'
+  naturalMaitri: 'Friend' | 'Neutral' | 'Enemy'
+  temporalMaitri: 'Friend' | 'Enemy'
+  compoundMaitri: CompoundFriendship
+  synthesis: string
+  bphsGuidance: string
+}
+
 export interface AstroChart {
   id: number
   name: string
@@ -206,9 +220,12 @@ export interface AstroChart {
   houses: HousePosition[]
   vargas: Record<string, VargaChartData>
   dashaTree: DashaPeriod[]
+  dashas?: DashaPeriod[]
   runningDasha: string[]
+  activeDashaChain?: any[]
   panchanga?: PanchangaData
   aspects?: any
+  relationships?: any
   yogas?: PlanetaryYoga[]
   raw?: any
 }

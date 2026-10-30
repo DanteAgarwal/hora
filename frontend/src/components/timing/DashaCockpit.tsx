@@ -33,10 +33,10 @@ export const DashaCockpit: React.FC<DashaCockpitProps> = ({
   onSelectPlanet,
   onSelectHouse,
 }) => {
-  // Find live running dasha hierarchy
+  // Find live running dasha hierarchy (preferring backend-computed 6-level active chain)
   const liveHierarchy = useMemo(() => {
-    return findRunningDashaHierarchy(chart.dashaTree)
-  }, [chart.dashaTree])
+    return findRunningDashaHierarchy(chart.dashaTree, Date.now(), chart.activeDashaChain || undefined)
+  }, [chart.dashaTree, chart.activeDashaChain])
 
   // MD & AD lords to display in the cockpit summary
   const activeMdLord = selectedMd?.lord || liveHierarchy.md?.lord || 'Sun'
@@ -250,44 +250,62 @@ export const DashaCockpit: React.FC<DashaCockpitProps> = ({
 
         {/* Tile 2: Mutual Sambhandha (MD ↔ AD) */}
         <div
+          onClick={() => onChangeDisplayMode('matrix')}
           style={{
-            background: 'rgba(15, 23, 42, 0.65)',
-            border: '1px solid rgba(148, 163, 184, 0.15)',
+            background: displayMode === 'matrix' ? 'rgba(217, 119, 6, 0.15)' : 'rgba(15, 23, 42, 0.65)',
+            border: displayMode === 'matrix' ? '1.5px solid #f59e0b' : '1px solid rgba(148, 163, 184, 0.15)',
             borderRadius: 6,
             padding: '10px 12px',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
           }}
+          title="Click to view full 9-Antardasha Sambhandha Matrix"
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
             <span className="eyebrow" style={{ fontSize: '0.68rem', margin: 0 }}>
               Lord Sambhandha ({activeMdLord} ↔ {activeAdLord})
             </span>
-            {sambhandha && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {sambhandha && (
+                <span
+                  style={{
+                    fontSize: '0.65rem',
+                    padding: '1px 6px',
+                    borderRadius: 3,
+                    fontWeight: 700,
+                    background:
+                      sambhandha.category === 'Auspicious'
+                        ? 'rgba(16, 185, 129, 0.2)'
+                        : sambhandha.category === 'Challenging Friction'
+                        ? 'rgba(239, 68, 68, 0.2)'
+                        : 'rgba(245, 158, 11, 0.2)',
+                    color:
+                      sambhandha.category === 'Auspicious'
+                        ? '#34d399'
+                        : sambhandha.category === 'Challenging Friction'
+                        ? '#f87171'
+                        : '#fbbf24',
+                  }}
+                >
+                  {sambhandha.category}
+                </span>
+              )}
               <span
                 style={{
                   fontSize: '0.65rem',
                   padding: '1px 6px',
                   borderRadius: 3,
+                  background: displayMode === 'matrix' ? '#d97706' : 'rgba(56, 189, 248, 0.18)',
+                  color: displayMode === 'matrix' ? '#ffffff' : '#38bdf8',
                   fontWeight: 700,
-                  background:
-                    sambhandha.category === 'Auspicious'
-                      ? 'rgba(16, 185, 129, 0.2)'
-                      : sambhandha.category === 'Challenging Friction'
-                      ? 'rgba(239, 68, 68, 0.2)'
-                      : 'rgba(245, 158, 11, 0.2)',
-                  color:
-                    sambhandha.category === 'Auspicious'
-                      ? '#34d399'
-                      : sambhandha.category === 'Challenging Friction'
-                      ? '#f87171'
-                      : '#fbbf24',
                 }}
               >
-                {sambhandha.category}
+                ⚡ 9-Lord Matrix →
               </span>
-            )}
+            </div>
           </div>
 
           {sambhandha ? (
@@ -295,7 +313,7 @@ export const DashaCockpit: React.FC<DashaCockpitProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem' }}>
                 <strong style={{ color: '#f8fafc' }}>{sambhandha.axisLabel}</strong>
                 <span style={{ color: '#64748b' }}>•</span>
-                <span style={{ color: '#fbbf24', fontSize: '0.74rem' }}>
+                <span style={{ color: '#fbbf24', fontSize: '0.74rem', fontWeight: 600 }}>
                   {sambhandha.compoundMaitri}
                 </span>
               </div>
@@ -306,6 +324,10 @@ export const DashaCockpit: React.FC<DashaCockpitProps> = ({
           ) : (
             <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>Single period active</span>
           )}
+
+          <div style={{ marginTop: 4, fontSize: '0.64rem', color: '#38bdf8', fontWeight: 600 }}>
+            Click to compare all 9 Antardashas against {activeMdLord} →
+          </div>
         </div>
 
         {/* Tile 3: Active Bhavas (Life Portfolios) */}

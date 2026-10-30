@@ -1,6 +1,12 @@
 import type { AstroChart, DashaPeriod } from '../../types/astro'
-import { expandDashaSubPeriods } from '../../adapters/horaAdapter'
-export { expandDashaSubPeriods }
+
+/**
+ * @deprecated Client-side dasha mathematical expansion has been removed.
+ * Subperiods are calculated strictly on the backend engine via fetchExpandedSubPeriods().
+ */
+export function expandDashaSubPeriods(parent: DashaPeriod, _targetLevel?: number): DashaPeriod[] {
+  return parent?.children || []
+}
 
 export interface DashaChainItem {
   level: number
@@ -234,10 +240,12 @@ export function calculateSambhandha(
 
 /**
  * Finds the running dasha hierarchy chain (MD, AD, PD, SD, PrD, DD) for a given timestamp.
+ * Prefers the 6-level active running chain computed directly by the backend engine.
  */
 export function findRunningDashaHierarchy(
   dashaTree: DashaPeriod[],
-  targetMs: number = Date.now()
+  targetMs: number = Date.now(),
+  activeChainFromBackend?: DashaChainItem[]
 ): {
   md: DashaPeriod | null
   ad: DashaPeriod | null
@@ -247,6 +255,24 @@ export function findRunningDashaHierarchy(
   dd: DashaPeriod | null
   chain: DashaChainItem[]
 } {
+  if (activeChainFromBackend && Array.isArray(activeChainFromBackend) && activeChainFromBackend.length > 0) {
+    const mdItem = activeChainFromBackend.find((c) => c.level === 1)
+    const adItem = activeChainFromBackend.find((c) => c.level === 2)
+    const pdItem = activeChainFromBackend.find((c) => c.level === 3)
+    const sdItem = activeChainFromBackend.find((c) => c.level === 4)
+    const prdItem = activeChainFromBackend.find((c) => c.level === 5)
+    const ddItem = activeChainFromBackend.find((c) => c.level === 6)
+    return {
+      md: mdItem?.period || null,
+      ad: adItem?.period || null,
+      pd: pdItem?.period || null,
+      sd: sdItem?.period || null,
+      prd: prdItem?.period || null,
+      dd: ddItem?.period || null,
+      chain: activeChainFromBackend,
+    }
+  }
+
   const findIn = (list: DashaPeriod[]): DashaPeriod | null => {
     return list.find((p) => {
       const start = new Date(p.start).getTime()
@@ -264,34 +290,16 @@ export function findRunningDashaHierarchy(
   const md = findIn(dashaTree)
   if (!md) return { md: null, ad: null, pd: null, sd: null, prd: null, dd: null, chain: [] }
 
-  const adList = md.children && md.children.length > 0 ? md.children : expandDashaSubPeriods(md, 2)
-  const ad = findIn(adList)
-  if (!ad) return { md, ad: null, pd: null, sd: null, prd: null, dd: null, chain: [{ level: 1, levelLabel: 'MD', lord: md.lord }] }
-
-  const pdList = ad.children && ad.children.length > 0 ? ad.children : expandDashaSubPeriods(ad, 3)
-  const pd = findIn(pdList)
-
-  let sd: DashaPeriod | null = null
-  let prd: DashaPeriod | null = null
-  let dd: DashaPeriod | null = null
-
-  if (pd) {
-    const sdList = expandDashaSubPeriods(pd, 4)
-    sd = findIn(sdList)
-    if (sd) {
-      const prdList = expandDashaSubPeriods(sd, 5)
-      prd = findIn(prdList)
-      if (prd) {
-        const ddList = expandDashaSubPeriods(prd, 6)
-        dd = findIn(ddList)
-      }
-    }
-  }
+  const ad = md.children && md.children.length > 0 ? findIn(md.children) : null
+  const pd = ad && ad.children && ad.children.length > 0 ? findIn(ad.children) : null
+  const sd = pd && pd.children && pd.children.length > 0 ? findIn(pd.children) : null
+  const prd = sd && sd.children && sd.children.length > 0 ? findIn(sd.children) : null
+  const dd = prd && prd.children && prd.children.length > 0 ? findIn(prd.children) : null
 
   const chain: DashaChainItem[] = [
     { level: 1, levelLabel: 'MD', lord: md.lord, period: md },
-    { level: 2, levelLabel: 'AD', lord: ad.lord, period: ad },
   ]
+  if (ad) chain.push({ level: 2, levelLabel: 'AD', lord: ad.lord, period: ad })
   if (pd) chain.push({ level: 3, levelLabel: 'PD', lord: pd.lord, period: pd })
   if (sd) chain.push({ level: 4, levelLabel: 'SD', lord: sd.lord, period: sd })
   if (prd) chain.push({ level: 5, levelLabel: 'PrD', lord: prd.lord, period: prd })
@@ -599,28 +607,28 @@ export function findDashaAncestors(
   if (targetLevel === 2) return ancestors
 
   // Level 2: Find AD in MD
-  const adList = md.children && md.children.length > 0 ? md.children : expandDashaSubPeriods(md, 2)
+  const adList = md.children || []
   const ad = adList.find(contains)
   if (!ad) return ancestors
   ancestors.push(ad)
   if (targetLevel === 3) return ancestors
 
   // Level 3: Find PD in AD
-  const pdList = ad.children && ad.children.length > 0 ? ad.children : expandDashaSubPeriods(ad, 3)
+  const pdList = ad.children || []
   const pd = pdList.find(contains)
   if (!pd) return ancestors
   ancestors.push(pd)
   if (targetLevel === 4) return ancestors
 
   // Level 4: Find SD in PD
-  const sdList = expandDashaSubPeriods(pd, 4)
+  const sdList = pd.children || []
   const sd = sdList.find(contains)
   if (!sd) return ancestors
   ancestors.push(sd)
   if (targetLevel === 5) return ancestors
 
   // Level 5: Find PrD in SD
-  const prdList = expandDashaSubPeriods(sd, 5)
+  const prdList = sd.children || []
   const prd = prdList.find(contains)
   if (!prd) return ancestors
   ancestors.push(prd)

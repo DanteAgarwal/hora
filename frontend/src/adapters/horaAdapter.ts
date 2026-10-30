@@ -533,56 +533,48 @@ export function normalizeChartPayload(computed: any): AstroChart {
         grahas: vGrahas,
       }
     } else {
-      // Calculate missing Shodasavarga division mathematically using classical BPHS rules
-      const lagnaDeg = parseFloat(lagnaDms) || 0
-      const vLagnaSign = calculateVargaSign(meta.code, lagnaSignIndex, lagnaDeg)
-      const vGrahas: VargaGrahaPlacement[] = planets.map((p) => {
-        const vSign = calculateVargaSign(meta.code, p.signIndex, p.degreeInSign)
-        const vHouse = ((vSign - vLagnaSign + 12) % 12) + 1
-        return {
-          id: p.id,
-          name: p.name,
-          short: p.short,
-          signIndex: vSign,
-          signName: SIGN_NAMES[vSign],
-          houseNumber: vHouse,
-          retrograde: p.retrograde,
-        }
-      })
+      // Default to rasi graha positions when divisional chart is not calculated by backend
+      const vGrahas: VargaGrahaPlacement[] = planets.map((p) => ({
+        id: p.id,
+        name: p.name,
+        short: p.short,
+        signIndex: p.signIndex,
+        signName: p.sign,
+        houseNumber: p.houseNumber,
+        retrograde: p.retrograde,
+      }))
 
       vargas[meta.code] = {
         code: meta.code,
         name: meta.name,
         divisions: meta.div,
         purpose: meta.purpose,
-        lagnaSignIndex: vLagnaSign,
-        lagnaSignName: SIGN_NAMES[vLagnaSign],
+        lagnaSignIndex,
+        lagnaSignName: SIGN_NAMES[lagnaSignIndex],
         grahas: vGrahas,
       }
     }
   }
 
-  // 4. Process Dashas (3-level Vimshottari normalization)
+  // 4. Process Dashas (Backend-calculated Vimshottari normalization)
   const moon = planets.find((p) => p.name === 'Moon')
   const sun = planets.find((p) => p.name === 'Sun')
   const rawDasha = computed.rawDasha
 
   let dashaTree: DashaPeriod[] = []
-  if (rawDasha?.periods && Array.isArray(rawDasha.periods) && rawDasha.periods.length > 0) {
-    dashaTree = rawDasha.periods.map((p: any) => normalizeDashaNode(p, 1))
-  } else if (computed.dashas && Array.isArray(computed.dashas) && computed.dashas.length > 0) {
+  if (computed.dashas && Array.isArray(computed.dashas) && computed.dashas.length > 0) {
     dashaTree = computed.dashas.map((p: any) => normalizeDashaNode(p, 1))
-  } else {
-    // Generate full classical 3-level Vimshottari tree from Moon position & birth date
-    const moonLong = moon?.longitude ?? (moon ? moon.signIndex * 30 + moon.degreeInSign : 0)
-    dashaTree = calculateFallbackVimshottariTree(birthData, moonLong)
+  } else if (rawDasha?.periods && Array.isArray(rawDasha.periods) && rawDasha.periods.length > 0) {
+    dashaTree = rawDasha.periods.map((p: any) => normalizeDashaNode(p, 1))
   }
 
-  // Determine running periods (MD, AD, PD)
+  // Determine running periods from backend
   let runningDasha: string[] = []
-  if (rawDasha?.running && Array.isArray(rawDasha.running) && rawDasha.running.length > 0) {
+  if (computed.activeDashaChain && Array.isArray(computed.activeDashaChain)) {
+    runningDasha = computed.activeDashaChain.map((c: any) => c.lord || c.lord_name)
+  } else if (rawDasha?.running && Array.isArray(rawDasha.running) && rawDasha.running.length > 0) {
     runningDasha = rawDasha.running.map((r: any) => r.lord_name || r.name)
-  } else {
+  } else if (dashaTree.length > 0) {
     runningDasha = resolveCurrentRunningDasha(dashaTree)
   }
 
@@ -618,10 +610,13 @@ export function normalizeChartPayload(computed: any): AstroChart {
     houses,
     vargas,
     dashaTree,
+    dashas: dashaTree,
+    activeDashaChain: computed.activeDashaChain || null,
     runningDasha: runningDasha.length ? runningDasha : (computed.currentMahadasha?.split(' / ') || []),
     panchanga: computed.rawPanchanga,
     aspects: computed.aspects,
-    yogas: detectClassicalYogas(planets, houses, computed.yogas),
+    relationships: computed.relationships || null,
+    yogas: normalizePlanetaryYogas(computed.yogas),
     raw: {
       rasi: rawRasi,
       dasha: rawDasha,
@@ -632,736 +627,60 @@ export function normalizeChartPayload(computed: any): AstroChart {
 }
 
 // ---------------------------------------------------------------------------
-// Classical Yogas Detection (BPHS & Classical Jyotish Literature)
+// Classical Planetary Yogas Normalization (Computed by Backend /v1/planetary-yoga)
 // ---------------------------------------------------------------------------
+
+export function normalizePlanetaryYogas(rawYogas: any): PlanetaryYoga[] {
+  if (!rawYogas) return []
+
+  const list: any[] = Array.isArray(rawYogas)
+    ? rawYogas
+    : Array.isArray(rawYogas.yogas)
+    ? rawYogas.yogas
+    : []
+
+  return list.map((y: any): PlanetaryYoga => {
+    const rawGroup = (y.group || 'General').toLowerCase()
+    let group: PlanetaryYoga['group'] = 'Other'
+    if (rawGroup.includes('raja')) group = 'Raja'
+    else if (rawGroup.includes('dhana')) group = 'Dhana'
+    else if (rawGroup.includes('mahapurusha')) group = 'Mahapurusha'
+    else if (rawGroup.includes('chandra') || rawGroup.includes('lunar')) group = 'Chandra'
+    else if (rawGroup.includes('ravi') || rawGroup.includes('solar')) group = 'Ravi'
+    else if (rawGroup.includes('nabhasa')) group = 'Nabhasa'
+    else if (rawGroup.includes('vipareeta')) group = 'Vipareeta'
+    else if (rawGroup.includes('general')) group = 'General'
+
+    const participants: string[] = Array.isArray(y.participants)
+      ? y.participants.map((p: any) => (typeof p === 'string' ? p : p.graha_name || p.name || ''))
+      : []
+
+    return {
+      key: y.key || y.name?.toLowerCase().replace(/\s+/g, '_') || 'yoga',
+      name: y.name || 'Planetary Yoga',
+      sanskritName: y.sanskrit_name || y.sanskritName || y.name,
+      group,
+      definition: y.definition || y.reason || '',
+      effects: y.effects || (Array.isArray(y.qualifiers) ? y.qualifiers.join(', ') : undefined),
+      present: Boolean(y.present),
+      strength: y.weakened ? 'Low' : 'High',
+      participants,
+      housesInvolved: y.houses_involved || y.housesInvolved || undefined,
+      reason: y.reason || undefined,
+    }
+  })
+}
 
 export function detectClassicalYogas(
-  planets: PlanetPosition[],
-  houses: HousePosition[],
+  _planets: PlanetPosition[],
+  _houses: HousePosition[],
   rawYogas?: any
 ): PlanetaryYoga[] {
-  const yogas: PlanetaryYoga[] = []
-  const pMap: Record<string, PlanetPosition> = {}
-  planets.forEach((p) => {
-    pMap[p.name] = p
-  })
-
-  const hMap: Record<number, HousePosition> = {}
-  houses.forEach((h) => {
-    hMap[h.number] = h
-  })
-
-  const getLordOfHouse = (hNum: number): PlanetPosition | undefined => {
-    const house = hMap[hNum]
-    if (!house) return undefined
-    return pMap[house.lord]
-  }
-
-  const sun = pMap['Sun']
-  const moon = pMap['Moon']
-  const mars = pMap['Mars']
-  const mercury = pMap['Mercury']
-  const jupiter = pMap['Jupiter']
-  const venus = pMap['Venus']
-  const saturn = pMap['Saturn']
-
-  // 1. Pancha Mahapurusha Yogas
-  if (mars && [1, 4, 7, 10].includes(mars.houseNumber) && (mars.dignity === 'Own Sign' || mars.dignity === 'Exalted')) {
-    yogas.push({
-      key: 'ruchaka',
-      name: 'Ruchaka Yoga',
-      sanskritName: 'रुचक योग',
-      group: 'Mahapurusha',
-      present: true,
-      definition: 'Mars placed in a Kendra (1st, 4th, 7th, or 10th house) in its own sign (Aries, Scorpio) or exaltation sign (Capricorn).',
-      effects: 'Bestows heroic valor, commanding military or executive authority, immense physical stamina, victory over adversaries, and lasting fame.',
-      participants: ['Mars'],
-      housesInvolved: [mars.houseNumber],
-      strength: 'High',
-      reason: `Mars occupies ${mars.houseOrdinal} house in ${mars.sign} (${mars.dignity}).`,
-    })
-  }
-
-  if (mercury && [1, 4, 7, 10].includes(mercury.houseNumber) && (mercury.dignity === 'Own Sign' || mercury.dignity === 'Exalted')) {
-    yogas.push({
-      key: 'bhadra',
-      name: 'Bhadra Yoga',
-      sanskritName: 'भद्र योग',
-      group: 'Mahapurusha',
-      present: true,
-      definition: 'Mercury placed in a Kendra (1st, 4th, 7th, or 10th house) in its own sign (Gemini) or exaltation sign (Virgo).',
-      effects: 'Endows extraordinary intellect, mathematical acumen, eloquence, mastery in trade and commerce, scholarly renown, and gracious longevity.',
-      participants: ['Mercury'],
-      housesInvolved: [mercury.houseNumber],
-      strength: 'High',
-      reason: `Mercury occupies ${mercury.houseOrdinal} house in ${mercury.sign} (${mercury.dignity}).`,
-    })
-  }
-
-  if (jupiter && [1, 4, 7, 10].includes(jupiter.houseNumber) && (jupiter.dignity === 'Own Sign' || jupiter.dignity === 'Exalted')) {
-    yogas.push({
-      key: 'hamsa',
-      name: 'Hamsa Yoga',
-      sanskritName: 'हंस योग',
-      group: 'Mahapurusha',
-      present: true,
-      definition: 'Jupiter placed in a Kendra (1st, 4th, 7th, or 10th house) in its own sign (Sagittarius, Pisces) or exaltation sign (Cancer).',
-      effects: 'Creates a revered spiritual guide, noble character, unshakeable virtue, profound wisdom, state honor, and benevolence towards all beings.',
-      participants: ['Jupiter'],
-      housesInvolved: [jupiter.houseNumber],
-      strength: 'High',
-      reason: `Jupiter occupies ${jupiter.houseOrdinal} house in ${jupiter.sign} (${jupiter.dignity}).`,
-    })
-  }
-
-  if (venus && [1, 4, 7, 10].includes(venus.houseNumber) && (venus.dignity === 'Own Sign' || venus.dignity === 'Exalted')) {
-    yogas.push({
-      key: 'malavya',
-      name: 'Malavya Yoga',
-      sanskritName: 'मालव्य योग',
-      group: 'Mahapurusha',
-      present: true,
-      definition: 'Venus placed in a Kendra (1st, 4th, 7th, or 10th house) in its own sign (Taurus, Libra) or exaltation sign (Pisces).',
-      effects: 'Grants refined aesthetic senses, wealth, exquisite residences, luxurious vehicles, happy conjugal bond, artistic genius, and magnetic charisma.',
-      participants: ['Venus'],
-      housesInvolved: [venus.houseNumber],
-      strength: 'High',
-      reason: `Venus occupies ${venus.houseOrdinal} house in ${venus.sign} (${venus.dignity}).`,
-    })
-  }
-
-  if (saturn && [1, 4, 7, 10].includes(saturn.houseNumber) && (saturn.dignity === 'Own Sign' || saturn.dignity === 'Exalted')) {
-    yogas.push({
-      key: 'sasa',
-      name: 'Sasa Yoga',
-      sanskritName: 'शश योग',
-      group: 'Mahapurusha',
-      present: true,
-      definition: 'Saturn placed in a Kendra (1st, 4th, 7th, or 10th house) in its own sign (Capricorn, Aquarius) or exaltation sign (Libra).',
-      effects: 'Confers commanding leadership over large organizations or masses, disciplined stamina, political authority, wealth through land and industry.',
-      participants: ['Saturn'],
-      housesInvolved: [saturn.houseNumber],
-      strength: 'High',
-      reason: `Saturn occupies ${saturn.houseOrdinal} house in ${saturn.sign} (${saturn.dignity}).`,
-    })
-  }
-
-  // 2. Gaja Kesari Yoga (Jupiter in Kendra from Moon)
-  if (moon && jupiter) {
-    const jupFromMoon = ((jupiter.houseNumber - moon.houseNumber + 12) % 12) + 1
-    if ([1, 4, 7, 10].includes(jupFromMoon)) {
-      yogas.push({
-        key: 'gaja_kesari',
-        name: 'Gaja Kesari Yoga',
-        sanskritName: 'गजकेसरी योग',
-        group: 'Raja',
-        present: true,
-        definition: 'Jupiter occupies a Kendra (1st, 4th, 7th, or 10th house) from the Moon.',
-        effects: 'Endows lion-like courage, unshakeable royal dignity, noble reputation, lasting prosperity, scholarly wisdom, and victory over adversaries.',
-        participants: ['Jupiter', 'Moon'],
-        housesInvolved: [moon.houseNumber, jupiter.houseNumber],
-        strength: 'High',
-        reason: `Jupiter is in the ${jupFromMoon}${jupFromMoon === 1 ? 'st' : jupFromMoon === 4 ? 'th' : jupFromMoon === 7 ? 'th' : 'th'} house from the Moon (Kendra).`,
-      })
-    }
-  }
-
-  // 3. Budhaditya Yoga (Sun + Mercury Conjunction)
-  if (sun && mercury && sun.houseNumber === mercury.houseNumber) {
-    const combust = mercury.combust
-    yogas.push({
-      key: 'budhaditya',
-      name: 'Budhaditya Yoga',
-      sanskritName: 'बुधादित्य योग',
-      group: 'Raja',
-      present: true,
-      definition: 'Sun and Mercury conjunct in the same house and rashi.',
-      effects: 'Confers high intelligence, administrative competence, analytical prowess, eloquence, and reputation in public service or commerce.',
-      participants: ['Sun', 'Mercury'],
-      housesInvolved: [sun.houseNumber],
-      strength: combust ? 'Medium' : 'High',
-      reason: `Sun and Mercury are together in the ${sun.houseOrdinal} house (${sun.sign})${combust ? ', Mercury within combustion orb' : ''}.`,
-    })
-  }
-
-  // 4. Chandra-Mangala Yoga (Moon + Mars)
-  if (moon && mars) {
-    const isConjunct = moon.houseNumber === mars.houseNumber
-    const isMutualAspect = ((mars.houseNumber - moon.houseNumber + 12) % 12) + 1 === 7
-    if (isConjunct || isMutualAspect) {
-      yogas.push({
-        key: 'chandra_mangala',
-        name: 'Chandra-Mangala Yoga',
-        sanskritName: 'चन्द्र-मङ्गल योग',
-        group: 'Dhana',
-        present: true,
-        definition: 'Moon and Mars in conjunction or in mutual 7th aspect.',
-        effects: 'Sharp commercial enterprise, capacity to accumulate wealth through property, land, metals, and resolute determination.',
-        participants: ['Moon', 'Mars'],
-        housesInvolved: isConjunct ? [moon.houseNumber] : [moon.houseNumber, mars.houseNumber],
-        strength: 'High',
-        reason: isConjunct
-          ? `Moon and Mars are conjunct in the ${moon.houseOrdinal} house (${moon.sign}).`
-          : `Moon in ${moon.houseOrdinal} house and Mars in ${mars.houseOrdinal} house form mutual 7th aspect.`,
-      })
-    }
-  }
-
-  // 5. Lunar Yogas: Sunaphaa, Anaphaa, Dhurdhura, Kemadruma
-  if (moon) {
-    const h2FromMoon = (moon.houseNumber % 12) + 1
-    const h12FromMoon = ((moon.houseNumber - 2 + 12) % 12) + 1
-
-    const planetsIn2 = planets.filter(
-      (p) => p.houseNumber === h2FromMoon && !['Sun', 'Moon', 'Rahu', 'Ketu', 'Lagna'].includes(p.name)
-    )
-    const planetsIn12 = planets.filter(
-      (p) => p.houseNumber === h12FromMoon && !['Sun', 'Moon', 'Rahu', 'Ketu', 'Lagna'].includes(p.name)
-    )
-
-    if (planetsIn2.length > 0 && planetsIn12.length > 0) {
-      yogas.push({
-        key: 'dhurdhura',
-        name: 'Dhurdhura Yoga',
-        sanskritName: 'धुरधुरा योग',
-        group: 'Chandra',
-        present: true,
-        definition: 'Planets other than Sun, Rahu, and Ketu occupy both the 2nd and 12th houses from the Moon.',
-        effects: 'Ensures immense wealth, luxurious vehicles, generous disposition, faithful allies, and lasting comfort throughout life.',
-        participants: [...planetsIn2.map((p) => p.name), ...planetsIn12.map((p) => p.name)],
-        housesInvolved: [h2FromMoon, h12FromMoon],
-        strength: 'High',
-        reason: `${planetsIn2.map((p) => p.name).join(', ')} in 2nd from Moon, and ${planetsIn12.map((p) => p.name).join(', ')} in 12th from Moon.`,
-      })
-    } else if (planetsIn2.length > 0) {
-      yogas.push({
-        key: 'sunaphaa',
-        name: 'Sunaphaa Yoga',
-        sanskritName: 'सुनफा योग',
-        group: 'Chandra',
-        present: true,
-        definition: 'Planets other than Sun, Rahu, and Ketu occupy the 2nd house from the Moon.',
-        effects: 'Self-earned wealth, intellectual sharp focus, good reputation, contented family life, and righteous deeds.',
-        participants: planetsIn2.map((p) => p.name),
-        housesInvolved: [h2FromMoon],
-        strength: 'High',
-        reason: `${planetsIn2.map((p) => p.name).join(', ')} in the 2nd house from the Moon.`,
-      })
-    } else if (planetsIn12.length > 0) {
-      yogas.push({
-        key: 'anaphaa',
-        name: 'Anaphaa Yoga',
-        sanskritName: 'अनफा योग',
-        group: 'Chandra',
-        present: true,
-        definition: 'Planets other than Sun, Rahu, and Ketu occupy the 12th house from the Moon.',
-        effects: 'Well-formed physical constitution, self-restraint, freedom from chronic diseases, generosity, and peace of mind.',
-        participants: planetsIn12.map((p) => p.name),
-        housesInvolved: [h12FromMoon],
-        strength: 'High',
-        reason: `${planetsIn12.map((p) => p.name).join(', ')} in the 12th house from the Moon.`,
-      })
-    } else {
-      const planetsInKendraFromMoon = planets.filter(
-        (p) => [1, 4, 7, 10].includes(((p.houseNumber - moon.houseNumber + 12) % 12) + 1) &&
-          !['Moon', 'Rahu', 'Ketu', 'Lagna'].includes(p.name)
-      )
-      const planetsInKendraFromLagna = planets.filter(
-        (p) => [1, 4, 7, 10].includes(p.houseNumber) && !['Moon', 'Rahu', 'Ketu', 'Lagna'].includes(p.name)
-      )
-      const hasBhanga = planetsInKendraFromMoon.length > 0 || planetsInKendraFromLagna.length > 0
-
-      yogas.push({
-        key: 'kemadruma',
-        name: hasBhanga ? 'Kemadruma Bhanga' : 'Kemadruma Yoga',
-        sanskritName: hasBhanga ? 'केमद्रुम भङ्ग' : 'केमद्रुम योग',
-        group: 'Chandra',
-        present: true,
-        definition: hasBhanga
-          ? 'Kemadruma cancelled: Although no planets flank the Moon, planets occupy Kendras from Moon or Lagna, transforming adversity into resilience.'
-          : 'No planets occupy the 2nd or 12th houses from the Moon (excluding Sun, Rahu, Ketu), nor are Kendras occupied.',
-        effects: hasBhanga
-          ? 'Early struggles turn into profound self-reliance, strategic wisdom, and enduring financial stability.'
-          : 'Fluctuating fortunes, emotional isolation, financial instability unless alleviated by dasha support.',
-        participants: ['Moon'],
-        housesInvolved: [moon.houseNumber],
-        strength: hasBhanga ? 'Low' : 'High',
-        reason: hasBhanga
-          ? `No planets in 2nd/12th from Moon, but cancelled by ${[...planetsInKendraFromMoon, ...planetsInKendraFromLagna].map((p) => p.name).slice(0, 3).join(', ')} in Kendras.`
-          : 'No planets in 2nd or 12th from Moon and no planets in Kendras.',
-      })
-    }
-  }
-
-  // 6. Solar Yogas: Vesi, Vosi, Ubhayachari
-  if (sun) {
-    const h2FromSun = (sun.houseNumber % 12) + 1
-    const h12FromSun = ((sun.houseNumber - 2 + 12) % 12) + 1
-
-    const planetsIn2 = planets.filter(
-      (p) => p.houseNumber === h2FromSun && !['Sun', 'Moon', 'Rahu', 'Ketu', 'Lagna'].includes(p.name)
-    )
-    const planetsIn12 = planets.filter(
-      (p) => p.houseNumber === h12FromSun && !['Sun', 'Moon', 'Rahu', 'Ketu', 'Lagna'].includes(p.name)
-    )
-
-    if (planetsIn2.length > 0 && planetsIn12.length > 0) {
-      yogas.push({
-        key: 'ubhayachari',
-        name: 'Ubhayachari Yoga',
-        sanskritName: 'उभयचरी योग',
-        group: 'Ravi',
-        present: true,
-        definition: 'Planets other than Moon, Rahu, and Ketu occupy both the 2nd and 12th houses from the Sun.',
-        effects: 'Symmetrical grace, royal or executive favor, broad renown, balanced fortune, and high social respect.',
-        participants: [...planetsIn2.map((p) => p.name), ...planetsIn12.map((p) => p.name)],
-        housesInvolved: [h2FromSun, h12FromSun],
-        strength: 'High',
-        reason: `${planetsIn2.map((p) => p.name).join(', ')} in 2nd from Sun, and ${planetsIn12.map((p) => p.name).join(', ')} in 12th from Sun.`,
-      })
-    } else if (planetsIn2.length > 0) {
-      yogas.push({
-        key: 'vesi',
-        name: 'Vesi Yoga',
-        sanskritName: 'वेशि योग',
-        group: 'Ravi',
-        present: true,
-        definition: 'Planets other than Moon, Rahu, and Ketu occupy the 2nd house from the Sun.',
-        effects: 'Truthful speech, steady wealth, happy disposition, balanced life, and renown.',
-        participants: planetsIn2.map((p) => p.name),
-        housesInvolved: [h2FromSun],
-        strength: 'High',
-        reason: `${planetsIn2.map((p) => p.name).join(', ')} in the 2nd house from the Sun.`,
-      })
-    } else if (planetsIn12.length > 0) {
-      yogas.push({
-        key: 'vosi',
-        name: 'Vosi Yoga',
-        sanskritName: 'वोशि योग',
-        group: 'Ravi',
-        present: true,
-        definition: 'Planets other than Moon, Rahu, and Ketu occupy the 12th house from the Sun.',
-        effects: 'Learned mind, charitable tendencies, strong memory, practical skill, and independent nature.',
-        participants: planetsIn12.map((p) => p.name),
-        housesInvolved: [h12FromSun],
-        strength: 'High',
-        reason: `${planetsIn12.map((p) => p.name).join(', ')} in the 12th house from the Sun.`,
-      })
-    }
-  }
-
-  // 7. Dharma-Karmadhipati Yoga (9th & 10th lords)
-  const lord9 = getLordOfHouse(9)
-  const lord10 = getLordOfHouse(10)
-  if (lord9 && lord10 && lord9.name !== lord10.name) {
-    const isConjunct = lord9.houseNumber === lord10.houseNumber
-    const isMutual = ((lord10.houseNumber - lord9.houseNumber + 12) % 12) + 1 === 7
-    if (isConjunct || isMutual) {
-      yogas.push({
-        key: 'dharma_karmadhipati',
-        name: 'Dharma-Karmadhipati Yoga',
-        sanskritName: 'धर्म-कर्माधिपति योग',
-        group: 'Raja',
-        present: true,
-        definition: 'Lords of the 9th house (Dharma) and 10th house (Karma) in conjunction or mutual aspect.',
-        effects: 'Foremost Raja Yoga conferring leadership, executive authority, high ethical purpose, supreme career achievement, and lasting legacy.',
-        participants: [lord9.name, lord10.name],
-        housesInvolved: isConjunct ? [lord9.houseNumber] : [lord9.houseNumber, lord10.houseNumber],
-        strength: 'High',
-        reason: isConjunct
-          ? `9th lord (${lord9.name}) and 10th lord (${lord10.name}) are conjunct in the ${lord9.houseOrdinal} house.`
-          : `9th lord (${lord9.name}) and 10th lord (${lord10.name}) are in mutual aspect.`,
-      })
-    }
-  }
-
-  // 8. Other Kendra-Trikona Raja Yogas
-  const kendraHouses = [1, 4, 7, 10]
-  const trikonaHouses = [1, 5, 9]
-  const rajaPairsFound = new Set<string>()
-
-  for (const k of kendraHouses) {
-    for (const t of trikonaHouses) {
-      if (k === t) continue
-      const lk = getLordOfHouse(k)
-      const lt = getLordOfHouse(t)
-      if (!lk || !lt || lk.name === lt.name) continue
-
-      const pairKey = [lk.name, lt.name].sort().join('-')
-      if (rajaPairsFound.has(pairKey)) continue
-
-      const isConjunct = lk.houseNumber === lt.houseNumber
-      const isMutual = ((lt.houseNumber - lk.houseNumber + 12) % 12) + 1 === 7
-
-      if (isConjunct || isMutual) {
-        rajaPairsFound.add(pairKey)
-        if ((k === 10 && t === 9) || (k === 9 && t === 10)) continue
-
-        yogas.push({
-          key: `raja_${k}_${t}`,
-          name: `Kendra-Trikona Raja Yoga (${k}th & ${t}th Lords)`,
-          sanskritName: 'केन्द्र-त्रिकोण राजयोग',
-          group: 'Raja',
-          present: true,
-          definition: `Lord of Kendra (${k}th house) and Lord of Trikona (${t}th house) are in ${isConjunct ? 'conjunction' : 'mutual aspect'}.`,
-          effects: 'Elevates status, unlocks executive recognition, provides institutional favor, and ensures success in endeavors.',
-          participants: [lk.name, lt.name],
-          housesInvolved: isConjunct ? [lk.houseNumber] : [lk.houseNumber, lt.houseNumber],
-          strength: 'High',
-          reason: `${k}th lord (${lk.name}) and ${t}th lord (${lt.name}) are ${isConjunct ? `conjunct in ${lk.houseOrdinal} house` : 'in mutual aspect'}.`,
-        })
-      }
-    }
-  }
-
-  // 9. Yogakaraka Planet Yoga
-  for (const p of planets) {
-    if (!p.lordOfHouses || p.lordOfHouses.length < 2) continue
-    const hasKendra = p.lordOfHouses.some((h) => [4, 7, 10].includes(h))
-    const hasTrikona = p.lordOfHouses.some((h) => [5, 9].includes(h))
-    if (hasKendra && hasTrikona) {
-      yogas.push({
-        key: `yogakaraka_${p.name.toLowerCase()}`,
-        name: `${p.name} Yogakaraka`,
-        sanskritName: 'योगकारक',
-        group: 'Raja',
-        present: true,
-        definition: `${p.name} rules both a Kendra (${p.lordOfHouses.filter((h) => [4, 7, 10].includes(h)).join(', ')}th) and a Trikona (${p.lordOfHouses.filter((h) => [5, 9].includes(h)).join(', ')}th) house for this Lagna.`,
-        effects: 'Acts as the single most auspicious planet for the chart, producing extraordinary growth, honor, and prosperity during its dashas.',
-        participants: [p.name],
-        housesInvolved: [p.houseNumber, ...p.lordOfHouses],
-        strength: 'High',
-        reason: `${p.name} simultaneously owns the ${p.lordOfHouses.join('th & ')}th houses.`,
-      })
-    }
-  }
-
-  // 10. Dhana Yogas
-  const lord1 = getLordOfHouse(1)
-  const lord2 = getLordOfHouse(2)
-  const lord5 = getLordOfHouse(5)
-  const lord11 = getLordOfHouse(11)
-
-  if (lord2 && lord11 && lord2.name !== lord11.name) {
-    if (lord2.houseNumber === lord11.houseNumber || ((lord11.houseNumber - lord2.houseNumber + 12) % 12) + 1 === 7) {
-      yogas.push({
-        key: 'dhana_2_11',
-        name: 'Mahadhana Yoga (2nd & 11th Lords)',
-        sanskritName: 'महाधन योग',
-        group: 'Dhana',
-        present: true,
-        definition: '2nd lord (accumulated wealth) and 11th lord (gains and cash flow) in conjunction or mutual aspect.',
-        effects: 'Exceptional financial capacity, multiple streams of income, compounding savings, and commercial success.',
-        participants: [lord2.name, lord11.name],
-        housesInvolved: [lord2.houseNumber, lord11.houseNumber],
-        strength: 'High',
-        reason: `2nd lord (${lord2.name}) and 11th lord (${lord11.name}) form a sambandha.`,
-      })
-    }
-  }
-
-  if (lord1 && lord2 && lord1.name !== lord2.name && lord1.houseNumber === lord2.houseNumber) {
-    yogas.push({
-      key: 'dhana_1_2',
-      name: 'Dhana Yoga (1st & 2nd Lords)',
-      sanskritName: 'धन योग',
-      group: 'Dhana',
-      present: true,
-      definition: 'Lagna lord and 2nd lord conjunct in the same house.',
-      effects: 'Direct personal mastery over wealth creation, dignified financial independence, and prosperous voice.',
-      participants: [lord1.name, lord2.name],
-      housesInvolved: [lord1.houseNumber],
-      strength: 'High',
-      reason: `Lagna lord (${lord1.name}) and 2nd lord (${lord2.name}) are conjunct in ${lord1.houseOrdinal} house.`,
-    })
-  }
-
-  if (lord5 && lord9 && lord5.name !== lord9.name && lord5.houseNumber === lord9.houseNumber) {
-    yogas.push({
-      key: 'dhana_5_9',
-      name: 'Lakshmi-Bhagya Dhana Yoga (5th & 9th Lords)',
-      sanskritName: 'भाग्य-धन योग',
-      group: 'Dhana',
-      present: true,
-      definition: '5th lord (Purva Punya, intelligence) and 9th lord (Fortune, divine grace) conjunct in the same house.',
-      effects: 'Extraordinary good fortune, effortless windfall, intuitive financial intelligence, and divine blessings.',
-      participants: [lord5.name, lord9.name],
-      housesInvolved: [lord5.houseNumber],
-      strength: 'High',
-      reason: `5th lord (${lord5.name}) and 9th lord (${lord9.name}) are conjunct in ${lord5.houseOrdinal} house.`,
-    })
-  }
-
-  // 11. Vipareeta Raja Yogas
-  const lord6 = getLordOfHouse(6)
-  const lord8 = getLordOfHouse(8)
-  const lord12 = getLordOfHouse(12)
-  const dusthanas = [6, 8, 12]
-
-  if (lord6 && dusthanas.includes(lord6.houseNumber)) {
-    yogas.push({
-      key: 'harsha',
-      name: 'Harsha Yoga',
-      sanskritName: 'हर्ष योग',
-      group: 'Vipareeta',
-      present: true,
-      definition: '6th lord placed in the 6th, 8th, or 12th house (Vipareeta Raja Yoga).',
-      effects: 'Overcomes opponents effortlessly, robust health, immunities from conspiracies, and rise through crisis.',
-      participants: [lord6.name],
-      housesInvolved: [lord6.houseNumber],
-      strength: 'High',
-      reason: `6th lord (${lord6.name}) is positioned in ${lord6.houseOrdinal} house (Dusthana).`,
-    })
-  }
-
-  if (lord8 && dusthanas.includes(lord8.houseNumber)) {
-    yogas.push({
-      key: 'sarala',
-      name: 'Sarala Yoga',
-      sanskritName: 'सरल योग',
-      group: 'Vipareeta',
-      present: true,
-      definition: '8th lord placed in the 6th, 8th, or 12th house (Vipareeta Raja Yoga).',
-      effects: 'Fearless character, longevity, strategic acumen, triumph over setbacks, sudden financial windfalls.',
-      participants: [lord8.name],
-      housesInvolved: [lord8.houseNumber],
-      strength: 'High',
-      reason: `8th lord (${lord8.name}) is positioned in ${lord8.houseOrdinal} house (Dusthana).`,
-    })
-  }
-
-  if (lord12 && dusthanas.includes(lord12.houseNumber)) {
-    yogas.push({
-      key: 'vimala',
-      name: 'Vimala Yoga',
-      sanskritName: 'विमल योग',
-      group: 'Vipareeta',
-      present: true,
-      definition: '12th lord placed in the 6th, 8th, or 12th house (Vipareeta Raja Yoga).',
-      effects: 'Frugal independence, noble character, spiritual peace, accumulation of wealth, shielded from major losses.',
-      participants: [lord12.name],
-      housesInvolved: [lord12.houseNumber],
-      strength: 'High',
-      reason: `12th lord (${lord12.name}) is positioned in ${lord12.houseOrdinal} house (Dusthana).`,
-    })
-  }
-
-  // 12. Amala Yoga
-  const benefics = ['Jupiter', 'Venus', 'Mercury']
-  const h10Occupants = planets.filter((p) => p.houseNumber === 10 && benefics.includes(p.name))
-  if (h10Occupants.length > 0) {
-    yogas.push({
-      key: 'amala',
-      name: 'Amala Yoga',
-      sanskritName: 'अमल योग',
-      group: 'Raja',
-      present: true,
-      definition: 'Natural benefic planet (Jupiter, Venus, or Mercury) occupies the 10th house from Lagna.',
-      effects: 'Stainless character, spotless public reputation, humanitarian achievements, lasting professional honor.',
-      participants: h10Occupants.map((p) => p.name),
-      housesInvolved: [10],
-      strength: 'High',
-      reason: `${h10Occupants.map((p) => p.name).join(', ')} occupies the 10th house.`,
-    })
-  }
-
-  // 13. Parivartana Yoga
-  const parivartanaDone = new Set<string>()
-  for (let hA = 1; hA <= 12; hA++) {
-    for (let hB = hA + 1; hB <= 12; hB++) {
-      const lordA = getLordOfHouse(hA)
-      const lordB = getLordOfHouse(hB)
-      if (!lordA || !lordB || lordA.name === lordB.name) continue
-
-      if (lordA.houseNumber === hB && lordB.houseNumber === hA) {
-        const pairKey = [hA, hB].join('-')
-        if (parivartanaDone.has(pairKey)) continue
-        parivartanaDone.add(pairKey)
-
-        const involvesDusthana = [6, 8, 12].includes(hA) || [6, 8, 12].includes(hB)
-        const involves3rd = hA === 3 || hB === 3
-        const yType = involvesDusthana ? 'Dainya' : involves3rd ? 'Khala' : 'Maha'
-
-        yogas.push({
-          key: `parivartana_${hA}_${hB}`,
-          name: `${yType} Parivartana Yoga (${hA}th & ${hB}th Houses)`,
-          sanskritName: 'परिवर्तन योग',
-          group: yType === 'Maha' ? 'Raja' : 'General',
-          present: true,
-          definition: `Mutual exchange of signs between ${hA}th lord (${lordA.name}) and ${hB}th lord (${lordB.name}). Classified as ${yType} Parivartana.`,
-          effects: yType === 'Maha'
-            ? 'Bestows exceptional wealth, prosperity, high social authority, and protective influence.'
-            : yType === 'Khala'
-            ? 'Yields fluctuations between struggle and success, requiring patience and grit.'
-            : 'Transforms crises into catalysts for spiritual or psychological breakthrough.',
-          participants: [lordA.name, lordB.name],
-          housesInvolved: [hA, hB],
-          strength: 'High',
-          reason: `${lordA.name} occupies ${hB}th house, and ${lordB.name} occupies ${hA}th house.`,
-        })
-      }
-    }
-  }
-
-  // Merge any backend yogas if present
-  if (rawYogas?.yogas && Array.isArray(rawYogas.yogas)) {
-    for (const by of rawYogas.yogas) {
-      if (!by.present) continue
-      const existing = yogas.find((y) => y.key === by.key || y.name.toLowerCase() === by.name?.toLowerCase())
-      if (!existing) {
-        yogas.push({
-          key: by.key,
-          name: by.name || by.key,
-          group: by.group === 'raja' ? 'Raja' : by.group === 'dhana' ? 'Dhana' : by.group === 'mahapurusha' ? 'Mahapurusha' : 'General',
-          definition: by.definition || by.description || 'Classical planetary combination from BPHS.',
-          effects: by.effects || 'Auspicious classical planetary combination.',
-          present: true,
-          strength: by.strength || 'Medium',
-          participants: (by.participants || []).map((p: any) => typeof p === 'string' ? p : p.graha_name || String(p)),
-          reason: by.reason || 'Calculated by Hora engine.',
-        })
-      }
-    }
-  }
-
-  return yogas
+  return normalizePlanetaryYogas(rawYogas)
 }
 
 // ---------------------------------------------------------------------------
-// Classical Varga Calculation Rules (BPHS)
-// ---------------------------------------------------------------------------
-
-export function calculateVargaSign(code: string, signIndex: number, degreeInSign: number): number {
-  const isOdd = signIndex % 2 === 0 // 0=Aries (odd), 1=Taurus (even)
-
-  switch (code) {
-    case 'D1':
-      return signIndex
-
-    case 'D2': {
-      // Hora (15°): Odd signs: 1st half Sun (Leo 4), 2nd half Moon (Cancer 3).
-      // Even signs: 1st half Moon (Cancer 3), 2nd half Sun (Leo 4).
-      const half = Math.floor(degreeInSign / 15) // 0 or 1
-      if (isOdd) {
-        return half === 0 ? 4 : 3
-      }
-      return half === 0 ? 3 : 4
-    }
-
-    case 'D3': {
-      // Drekkana (10°): 1st decanate same sign, 2nd 5th sign, 3rd 9th sign
-      const dec = Math.floor(degreeInSign / 10) // 0, 1, 2
-      return (signIndex + dec * 4) % 12
-    }
-
-    case 'D4': {
-      // Chaturthamsha (7°30'): Parashari BPHS counts 4 kendras (1st, 4th, 7th, 10th from natal rasi)
-      const part = Math.floor(degreeInSign / 7.5) // 0..3
-      return (signIndex + part * 3) % 12
-    }
-
-    case 'D7': {
-      // Saptamsha (4°17'08.57"): Odd from self; Even from 7th
-      const part = Math.floor(degreeInSign / (30 / 7)) // 0..6
-      const start = isOdd ? signIndex : (signIndex + 6) % 12
-      return (start + part) % 12
-    }
-
-    case 'D9':
-      return calculateNavamshaSign(signIndex, degreeInSign)
-
-    case 'D10': {
-      // Dashamsha (3°): Odd from self; Even from 9th
-      const part = Math.floor(degreeInSign / 3) // 0..9
-      const start = isOdd ? signIndex : (signIndex + 8) % 12
-      return (start + part) % 12
-    }
-
-    case 'D12': {
-      // Dvadashamsha (2°30'): Starts from self
-      const part = Math.floor(degreeInSign / 2.5) // 0..11
-      return (signIndex + part) % 12
-    }
-
-    case 'D16': {
-      // Shodashamsha (1°52'30"): Moveable from Aries(0), Fixed from Leo(4), Dual from Sagittarius(8)
-      const part = Math.floor(degreeInSign / 1.875) // 0..15
-      const signType = signIndex % 3 // 0=Movable, 1=Fixed, 2=Dual
-      const start = signType === 0 ? 0 : signType === 1 ? 4 : 8
-      return (start + part) % 12
-    }
-
-    case 'D20': {
-      // Vimshamsha (1°30'): Moveable from Aries(0), Fixed from Sagittarius(8), Dual from Leo(4)
-      const part = Math.floor(degreeInSign / 1.5) // 0..19
-      const signType = signIndex % 3
-      const start = signType === 0 ? 0 : signType === 1 ? 8 : 4
-      return (start + part) % 12
-    }
-
-    case 'D24': {
-      // Chaturvimshamsha (1°15'): Odd from Leo(4); Even from Cancer(3)
-      const part = Math.floor(degreeInSign / 1.25) // 0..23
-      const start = isOdd ? 4 : 3
-      return (start + part) % 12
-    }
-
-    case 'D27': {
-      // Saptavimshamsha (1°06'40"): Fire from Aries(0), Earth from Cancer(3), Air from Libra(6), Water from Capricorn(9)
-      const part = Math.floor(degreeInSign / (30 / 27)) // 0..26
-      const signElem = signIndex % 4 // 0=Fire, 1=Earth, 2=Air, 3=Water
-      const start = signElem === 0 ? 0 : signElem === 1 ? 3 : signElem === 2 ? 6 : 9
-      return (start + part) % 12
-    }
-
-    case 'D30': {
-      // Trimshamsha: Unequal division (BPHS / Jagannatha Hora)
-      // Odd signs: 0-5° Mars (0 Aries), 5-10° Saturn (10 Aquarius), 10-18° Jupiter (8 Sagittarius), 18-25° Mercury (2 Gemini), 25-30° Venus (6 Libra)
-      // Even signs: 0-5° Venus (1 Taurus), 5-12° Mercury (5 Virgo), 12-20° Jupiter (11 Pisces), 20-25° Saturn (9 Capricorn), 25-30° Mars (7 Scorpio)
-      if (isOdd) {
-        if (degreeInSign < 5) return 0 // Aries (Mars)
-        if (degreeInSign < 10) return 10 // Aquarius (Saturn)
-        if (degreeInSign < 18) return 8 // Sagittarius (Jupiter)
-        if (degreeInSign < 25) return 2 // Gemini (Mercury)
-        return 6 // Libra (Venus)
-      } else {
-        if (degreeInSign < 5) return 1 // Taurus (Venus)
-        if (degreeInSign < 12) return 5 // Virgo (Mercury)
-        if (degreeInSign < 20) return 11 // Pisces (Jupiter)
-        if (degreeInSign < 25) return 9 // Capricorn (Saturn)
-        return 7 // Scorpio (Mars)
-      }
-    }
-
-
-    case 'D40': {
-      // Khavedamsha (0°45'): Odd from Aries(0); Even from Libra(6)
-      const part = Math.floor(degreeInSign / 0.75) // 0..39
-      const start = isOdd ? 0 : 6
-      return (start + part) % 12
-    }
-
-    case 'D45': {
-      // Akshavedamsha (0°40'): Moveable from Aries(0), Fixed from Leo(4), Dual from Sagittarius(8)
-      const part = Math.floor(degreeInSign / (2 / 3)) // 0..44
-      const signType = signIndex % 3
-      const start = signType === 0 ? 0 : signType === 1 ? 4 : 8
-      return (start + part) % 12
-    }
-
-    case 'D60': {
-      // Shashtiamsha (0°30'): Starts from sign itself
-      const part = Math.floor(degreeInSign / 0.5) // 0..59
-      return (signIndex + part) % 12
-    }
-
-    default:
-      return signIndex
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Vimshottari Dasha Normalization & 3-Level Calculation Helpers
+// Vimshottari Dasha Normalization & Traversal Helpers
 // ---------------------------------------------------------------------------
 
 export const VIMSHOTTARI_CYCLE: { name: string; years: number }[] = [
@@ -1376,7 +695,7 @@ export const VIMSHOTTARI_CYCLE: { name: string; years: number }[] = [
   { name: 'Mercury', years: 17 },
 ]
 
-function normalizeDashaNode(node: any, level = 1): DashaPeriod {
+export function normalizeDashaNode(node: any, level = 1): DashaPeriod {
   let lordName = node.lord_name || (typeof node.lord === 'string' ? node.lord : '') || node.period || ''
   if (!lordName && typeof node.lord === 'number') {
     lordName = VIMSHOTTARI_CYCLE[node.lord % 9]?.name || 'Unknown'
@@ -1399,90 +718,7 @@ function normalizeDashaNode(node: any, level = 1): DashaPeriod {
   }
 }
 
-function calculateFallbackVimshottariTree(birthData: BirthData, moonLongitude: number): DashaPeriod[] {
-  const nakshatraSpan = 360 / 27 // 13.333333°
-  const nakIndex = Math.floor(moonLongitude / nakshatraSpan)
-  const degInNak = moonLongitude - nakIndex * nakshatraSpan
-  const fracElapsed = degInNak / nakshatraSpan
-
-  const startLordIndex = nakIndex % 9
-  const birthDate = new Date(Date.UTC(birthData.year, birthData.month - 1, birthData.day, birthData.hour, birthData.minute, birthData.second || 0))
-  const msPerYear = 365.2425 * 24 * 60 * 60 * 1000
-
-  const periods: DashaPeriod[] = []
-  let currentDate = new Date(birthDate.getTime() - fracElapsed * VIMSHOTTARI_CYCLE[startLordIndex].years * msPerYear)
-
-  for (let i = 0; i < 9; i++) {
-    const lordIdx = (startLordIndex + i) % 9
-    const lordMeta = VIMSHOTTARI_CYCLE[lordIdx]
-    const mdYears = lordMeta.years
-    const mdDurationMs = mdYears * msPerYear
-    const mdStart = new Date(currentDate.getTime())
-    const mdEnd = new Date(mdStart.getTime() + mdDurationMs)
-
-    // Build 9 Antardashas
-    const adChildren: DashaPeriod[] = []
-    let adCurrentDate = new Date(mdStart.getTime())
-
-    for (let j = 0; j < 9; j++) {
-      const adLordIdx = (lordIdx + j) % 9
-      const adLordMeta = VIMSHOTTARI_CYCLE[adLordIdx]
-      const adFraction = adLordMeta.years / 120
-      const adDurationMs = mdDurationMs * adFraction
-      const adStart = new Date(adCurrentDate.getTime())
-      const adEnd = new Date(adStart.getTime() + adDurationMs)
-
-      // Build 9 Pratyantardashas
-      const pdChildren: DashaPeriod[] = []
-      let pdCurrentDate = new Date(adStart.getTime())
-
-      for (let k = 0; k < 9; k++) {
-        const pdLordIdx = (adLordIdx + k) % 9
-        const pdLordMeta = VIMSHOTTARI_CYCLE[pdLordIdx]
-        const pdFraction = pdLordMeta.years / 120
-        const pdDurationMs = adDurationMs * pdFraction
-        const pdStart = new Date(pdCurrentDate.getTime())
-        const pdEnd = new Date(pdStart.getTime() + pdDurationMs)
-
-        pdChildren.push({
-          lord: pdLordMeta.name,
-          level: 3,
-          start: pdStart.toISOString().slice(0, 10),
-          end: pdEnd.toISOString().slice(0, 10),
-          durationDays: Math.round(pdDurationMs / (24 * 3600 * 1000)),
-        })
-
-        pdCurrentDate = pdEnd
-      }
-
-      adChildren.push({
-        lord: adLordMeta.name,
-        level: 2,
-        start: adStart.toISOString().slice(0, 10),
-        end: adEnd.toISOString().slice(0, 10),
-        durationDays: Math.round(adDurationMs / (24 * 3600 * 1000)),
-        children: pdChildren,
-      })
-
-      adCurrentDate = adEnd
-    }
-
-    periods.push({
-      lord: lordMeta.name,
-      level: 1,
-      start: mdStart.toISOString().slice(0, 10),
-      end: mdEnd.toISOString().slice(0, 10),
-      durationDays: Math.round(mdDurationMs / (24 * 3600 * 1000)),
-      children: adChildren,
-    })
-
-    currentDate = mdEnd
-  }
-
-  return periods
-}
-
-function resolveCurrentRunningDasha(dashaTree: DashaPeriod[]): string[] {
+export function resolveCurrentRunningDasha(dashaTree: DashaPeriod[]): string[] {
   const now = new Date().toISOString().slice(0, 10)
   for (const md of dashaTree) {
     if (md.start <= now && now <= md.end) {
@@ -1510,61 +746,10 @@ function resolveCurrentRunningDasha(dashaTree: DashaPeriod[]): string[] {
 }
 
 /**
- * Dynamically expands any dasha period into its 9 sub-periods down to Level 6:
- * Level 1: Mahadasha (MD)
- * Level 2: Antardasha (AD / Bhukti)
- * Level 3: Pratyantardasha (PD)
- * Level 4: Sookshma Dasha (SD)
- * Level 5: Prana Dasha (PrD)
- * Level 6: Deha Dasha (DD / Sub-Sookshma)
+ * @deprecated Client-side dasha mathematical expansion has been removed.
+ * Sub-period expansion is computed by the backend engine via fetchExpandedSubPeriods().
+ * This function returns pre-existing children without computing client-side math.
  */
-export function expandDashaSubPeriods(parent: DashaPeriod, targetLevel: number = parent.level + 1): DashaPeriod[] {
-  if (targetLevel <= parent.level) return []
-
-  if (parent.children && parent.children.length === 9 && targetLevel === parent.level + 1) {
-    return parent.children
-  }
-
-  const startMs = new Date(parent.start).getTime()
-  const endMs = new Date(parent.end).getTime()
-  if (isNaN(startMs) || isNaN(endMs) || endMs <= startMs) return []
-
-  const spanMs = endMs - startMs
-  const parentLordClean = parent.lord.trim().toLowerCase()
-  let parentLordIdx = VIMSHOTTARI_CYCLE.findIndex(
-    (v) => v.name.toLowerCase() === parentLordClean
-  )
-  if (parentLordIdx < 0) parentLordIdx = 0
-
-  const nextLevel = parent.level + 1
-  const children: DashaPeriod[] = []
-  let cursor = startMs
-
-  for (let k = 0; k < 9; k++) {
-    const subIdx = (parentLordIdx + k) % 9
-    const subMeta = VIMSHOTTARI_CYCLE[subIdx]
-    const subFraction = subMeta.years / 120
-    const subSpanMs = spanMs * subFraction
-    const subStart = new Date(cursor)
-    const subEnd = new Date(cursor + subSpanMs)
-
-    const childNode: DashaPeriod = {
-      lord: subMeta.name,
-      level: nextLevel,
-      start: subStart.toISOString().replace('T', ' ').slice(0, nextLevel >= 5 ? 19 : nextLevel >= 4 ? 16 : 10),
-      end: subEnd.toISOString().replace('T', ' ').slice(0, nextLevel >= 5 ? 19 : nextLevel >= 4 ? 16 : 10),
-      durationDays: subSpanMs / (24 * 3600 * 1000),
-      children: [],
-    }
-
-    if (nextLevel < targetLevel) {
-      childNode.children = expandDashaSubPeriods(childNode, targetLevel)
-    }
-
-    children.push(childNode)
-    cursor += subSpanMs
-  }
-
-  return children
+export function expandDashaSubPeriods(parent: DashaPeriod, _targetLevel?: number): DashaPeriod[] {
+  return parent?.children || []
 }
-

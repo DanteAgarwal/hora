@@ -35,3 +35,21 @@ def dasha(req: DashaRequest) -> dict:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except dasha_service.BadAsOf as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/expand", summary="Expand a dasha period into its sub-periods")
+def expand(req: dict) -> dict:
+    try:
+        parent = req.get("parent") or req
+        target_level = req.get("target_level") or req.get("targetLevel")
+        system = req.get("system", "vimshottari")
+        utc_offset_hours = req.get("utc_offset_hours", 0.0)
+        return dasha_service.expand_period(
+            parent,
+            target_level=target_level,
+            system=system,
+            utc_offset_hours=utc_offset_hours,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+

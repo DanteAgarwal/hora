@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import type { AstroChart, DashaPeriod, PlanetPosition } from '../../types/astro'
 import { ZODIAC_SIGNS } from '../../types/astro'
 import {
@@ -8,11 +8,11 @@ import {
   checkDashaSandhi,
   getActivatedHouses,
   getMahadashaProfile,
-  expandDashaSubPeriods,
   getPeriodKey,
   isSamePeriod,
   type DashaChainItem,
 } from '../timing/dashaUtils'
+import { fetchExpandedSubPeriods } from '../../services/dashaApi'
 
 interface DashaInspectorProps {
   chart: AstroChart
@@ -108,12 +108,28 @@ export const DashaInspector: React.FC<DashaInspectorProps> = ({
   // Level 3 -> Level 4 (SD)
   // Level 4 -> Level 5 (PrD)
   // Level 5 -> Level 6 (DD)
-  const childSubPeriods = useMemo(() => {
-    if (!activePeriod || (activePeriod.level && activePeriod.level >= 6)) return []
+  const [childSubPeriods, setChildSubPeriods] = useState<DashaPeriod[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!activePeriod || (activePeriod.level && activePeriod.level >= 6)) {
+      setChildSubPeriods([])
+      return
+    }
+
+    if (activePeriod.children && activePeriod.children.length === 9) {
+      setChildSubPeriods(activePeriod.children)
+      return
+    }
+
     const nextLevel = (activePeriod.level || 1) + 1
-    return activePeriod.children && activePeriod.children.length > 0
-      ? activePeriod.children
-      : expandDashaSubPeriods(activePeriod, nextLevel)
+    fetchExpandedSubPeriods(activePeriod, nextLevel).then((subs) => {
+      if (!cancelled) setChildSubPeriods(subs)
+    })
+
+    return () => {
+      cancelled = true
+    }
   }, [activePeriod])
 
   const childLevelMeta = useMemo(() => {

@@ -8,7 +8,7 @@ import {
   getPeriodKey,
   type DashaChainItem,
 } from './dashaUtils'
-import { expandDashaSubPeriods } from '../../adapters/horaAdapter'
+import { fetchExpandedSubPeriods } from '../../services/dashaApi'
 import { DashaCockpit } from './DashaCockpit'
 import { SambhandhaMatrix } from './SambhandhaMatrix'
 import { DashaInspector } from '../inspector/DashaInspector'
@@ -47,7 +47,7 @@ export const DashaTimeline: React.FC<DashaTimelineProps> = ({
   // Automatic initial selection of live running dasha down to Level 6
   useEffect(() => {
     const nowMs = Date.now()
-    const live = findRunningDashaHierarchy(dashaTree, nowMs)
+    const live = findRunningDashaHierarchy(dashaTree, nowMs, chart.activeDashaChain || undefined)
     if (live.md) setSelectedMd(live.md)
     if (live.ad) setSelectedAd(live.ad)
     if (live.pd) setSelectedPd(live.pd)
@@ -57,11 +57,11 @@ export const DashaTimeline: React.FC<DashaTimelineProps> = ({
 
     // Initial inspection defaults to active Antardasha or Mahadasha for immediate high-value context
     setInspectedPeriod(live.ad || live.md || null)
-  }, [dashaTree])
+  }, [dashaTree, chart.activeDashaChain])
 
   // One-click Jump to live running dasha across all 6 levels
   const handleJumpToLive = () => {
-    const live = findRunningDashaHierarchy(dashaTree)
+    const live = findRunningDashaHierarchy(dashaTree, Date.now(), chart.activeDashaChain || undefined)
     if (live.md) setSelectedMd(live.md)
     if (live.ad) setSelectedAd(live.ad)
     if (live.pd) setSelectedPd(live.pd)
@@ -170,28 +170,70 @@ export const DashaTimeline: React.FC<DashaTimelineProps> = ({
 
   // Sub-period list derivations
   const adList = useMemo(() => {
-    if (!selectedMd) return []
-    return selectedMd.children && selectedMd.children.length > 0 ? selectedMd.children : expandDashaSubPeriods(selectedMd, 2)
+    return selectedMd?.children || []
   }, [selectedMd])
 
   const pdList = useMemo(() => {
-    if (!selectedAd) return []
-    return selectedAd.children && selectedAd.children.length > 0 ? selectedAd.children : expandDashaSubPeriods(selectedAd, 3)
+    return selectedAd?.children || []
   }, [selectedAd])
 
-  const sdList = useMemo(() => {
-    if (!selectedPd) return []
-    return expandDashaSubPeriods(selectedPd, 4)
+  // Levels 4, 5, 6 loaded asynchronously on-demand from the backend engine
+  const [sdList, setSdList] = useState<DashaPeriod[]>([])
+  const [prdList, setPrdList] = useState<DashaPeriod[]>([])
+  const [ddList, setDdList] = useState<DashaPeriod[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!selectedPd) {
+      setSdList([])
+      return
+    }
+    if (selectedPd.children && selectedPd.children.length === 9) {
+      setSdList(selectedPd.children)
+      return
+    }
+    fetchExpandedSubPeriods(selectedPd, 4).then((subs) => {
+      if (!cancelled) setSdList(subs)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [selectedPd])
 
-  const prdList = useMemo(() => {
-    if (!selectedSd) return []
-    return expandDashaSubPeriods(selectedSd, 5)
+  useEffect(() => {
+    let cancelled = false
+    if (!selectedSd) {
+      setPrdList([])
+      return
+    }
+    if (selectedSd.children && selectedSd.children.length === 9) {
+      setPrdList(selectedSd.children)
+      return
+    }
+    fetchExpandedSubPeriods(selectedSd, 5).then((subs) => {
+      if (!cancelled) setPrdList(subs)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [selectedSd])
 
-  const ddList = useMemo(() => {
-    if (!selectedPrd) return []
-    return expandDashaSubPeriods(selectedPrd, 6)
+  useEffect(() => {
+    let cancelled = false
+    if (!selectedPrd) {
+      setDdList([])
+      return
+    }
+    if (selectedPrd.children && selectedPrd.children.length === 9) {
+      setDdList(selectedPrd.children)
+      return
+    }
+    fetchExpandedSubPeriods(selectedPrd, 6).then((subs) => {
+      if (!cancelled) setDdList(subs)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [selectedPrd])
 
   // Generic helper for timeline calculations of any level list
@@ -785,6 +827,23 @@ export const DashaTimeline: React.FC<DashaTimelineProps> = ({
                 )}
               </div>
             )}
+
+            {/* Embedded 9-Antardasha Sambhandha Matrix in Timeline View */}
+            <div style={{ marginTop: 6 }}>
+              <SambhandhaMatrix
+                chart={chart}
+                selectedMd={selectedMd}
+                selectedAd={selectedAd}
+                onSelectAd={(ad) => {
+                  handleSelectPeriod(ad)
+                }}
+                onSelectPlanet={onSelectPlanet}
+                onSelectHouse={onSelectHouse}
+                onDrillIntoTimeline={(ad) => {
+                  handleSelectPeriod(ad)
+                }}
+              />
+            </div>
           </div>
 
           {/* Right Column: Embedded Real-Time Dasha Inspector Card */}
@@ -801,19 +860,34 @@ export const DashaTimeline: React.FC<DashaTimelineProps> = ({
         </div>
       )}
 
-      {/* Sambhandha Matrix Mode */}
+      {/* Sambhandha Matrix Mode (Dedicated Full-Screen View) */}
       {displayMode === 'matrix' && (
-        <SambhandhaMatrix
-          chart={chart}
-          selectedMd={selectedMd}
-          selectedAd={selectedAd}
-          onSelectAd={(ad) => {
-            handleSelectPeriod(ad)
-            setDisplayMode('timeline')
-          }}
-          onSelectPlanet={onSelectPlanet}
-          onSelectHouse={onSelectHouse}
-        />
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 350px', gap: 16 }}>
+          <SambhandhaMatrix
+            chart={chart}
+            selectedMd={selectedMd}
+            selectedAd={selectedAd}
+            onSelectAd={(ad) => {
+              handleSelectPeriod(ad)
+            }}
+            onSelectPlanet={onSelectPlanet}
+            onSelectHouse={onSelectHouse}
+            onDrillIntoTimeline={(ad) => {
+              handleSelectPeriod(ad)
+              setDisplayMode('timeline')
+            }}
+          />
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <DashaInspector
+              chart={chart}
+              selectedPeriod={activeInspectPeriod}
+              hierarchyChain={hierarchyChain}
+              onSelectPlanet={onSelectPlanet}
+              onSelectHouse={onSelectHouse}
+              onSelectPeriod={handleSelectPeriod}
+            />
+          </div>
+        </div>
       )}
 
       {/* Table Mode */}
@@ -885,7 +959,7 @@ export const DashaTimeline: React.FC<DashaTimelineProps> = ({
                   .map((md, mdIdx) => {
                     const nowStr = new Date().toISOString().slice(0, 10)
                     const isMdRunning = md.start.slice(0, 10) <= nowStr && nowStr <= md.end.slice(0, 10)
-                    const subAds = md.children && md.children.length > 0 ? md.children : expandDashaSubPeriods(md, 2)
+                    const subAds = md.children || []
 
                     return (
                       <React.Fragment key={getPeriodKey(md, mdIdx)}>
