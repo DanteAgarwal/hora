@@ -9,55 +9,14 @@ import type {
   VargaChartData,
   VargaGrahaPlacement,
 } from '../types/astro'
-import { PLANET_META } from '../types/astro'
-
-const SIGN_NAMES = [
-  'Aries', 'Taurus', 'Gemini', 'Cancer',
-  'Leo', 'Virgo', 'Libra', 'Scorpio',
-  'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'
-]
-
-const SIGN_LORDS: Record<string, string> = {
-  Aries: 'Mars', Taurus: 'Venus', Gemini: 'Mercury', Cancer: 'Moon',
-  Leo: 'Sun', Virgo: 'Mercury', Libra: 'Venus', Scorpio: 'Mars',
-  Sagittarius: 'Jupiter', Capricorn: 'Saturn', Aquarius: 'Saturn', Pisces: 'Jupiter',
-}
-
-const EXALTATION_SIGNS: Record<string, number> = {
-  Sun: 0, // Aries
-  Moon: 1, // Taurus
-  Mars: 9, // Capricorn
-  Mercury: 5, // Virgo
-  Jupiter: 3, // Cancer
-  Venus: 11, // Pisces
-  Saturn: 6, // Libra
-  Rahu: 1, // Taurus
-  Ketu: 7, // Scorpio
-}
-
-const DEBILITATION_SIGNS: Record<string, number> = {
-  Sun: 6, // Libra
-  Moon: 7, // Scorpio
-  Mars: 3, // Cancer
-  Mercury: 11, // Pisces
-  Jupiter: 9, // Capricorn
-  Venus: 5, // Virgo
-  Saturn: 0, // Aries
-  Rahu: 7, // Scorpio
-  Ketu: 1, // Taurus
-}
-
-const OWN_SIGNS: Record<string, number[]> = {
-  Sun: [4],
-  Moon: [3],
-  Mars: [0, 7],
-  Mercury: [2, 5],
-  Jupiter: [8, 11],
-  Venus: [1, 6],
-  Saturn: [9, 10],
-  Rahu: [10],
-  Ketu: [7],
-}
+import {
+  PLANET_META,
+  SIGN_NAMES,
+  SIGN_LORDS,
+  EXALTATION_SIGNS,
+  DEBILITATION_SIGNS,
+  OWN_SIGNS,
+} from '../types/astro'
 
 export function parseSignIndex(signStr: string): number {
   if (!signStr) return 0

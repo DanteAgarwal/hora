@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import type { AstroChart, ChartStyle, DignityType } from '../../types/astro'
-import { ZODIAC_SIGNS } from '../../types/astro'
+import { ZODIAC_SIGNS, EXALTATION_SIGNS, DEBILITATION_SIGNS, OWN_SIGNS } from '../../types/astro'
 import { VedicChart } from '../chart/VedicChart'
 
 interface VargaComparisonProps {
@@ -62,13 +62,9 @@ export const VargaComparison: React.FC<VargaComparisonProps> = ({
 
       // Derive D9 Dignity
       let d9Dignity: DignityType = 'Calculated'
-      const EXALT: Record<string, number> = { Sun: 0, Moon: 1, Mars: 9, Mercury: 5, Jupiter: 3, Venus: 11, Saturn: 6, Rahu: 1, Ketu: 7 }
-      const DEBIL: Record<string, number> = { Sun: 6, Moon: 7, Mars: 3, Mercury: 11, Jupiter: 9, Venus: 5, Saturn: 0, Rahu: 7, Ketu: 1 }
-      const OWN: Record<string, number[]> = { Sun: [4], Moon: [3], Mars: [0, 7], Mercury: [2, 5], Jupiter: [8, 11], Venus: [1, 6], Saturn: [9, 10], Rahu: [10], Ketu: [7] }
-
-      if (EXALT[p.name] === d9SignIndex) d9Dignity = 'Exalted'
-      else if (DEBIL[p.name] === d9SignIndex) d9Dignity = 'Debilitated'
-      else if (OWN[p.name]?.includes(d9SignIndex)) d9Dignity = 'Own Sign'
+      if (EXALTATION_SIGNS[p.name] === d9SignIndex) d9Dignity = 'Exalted'
+      else if (DEBILITATION_SIGNS[p.name] === d9SignIndex) d9Dignity = 'Debilitated'
+      else if (OWN_SIGNS[p.name]?.includes(d9SignIndex)) d9Dignity = 'Own Sign'
       else d9Dignity = 'Neutral'
 
       // Evaluate Shift

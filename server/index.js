@@ -50,19 +50,20 @@ async function horaFetch(urlPath, body) {
   return response.json()
 }
 
+const ordinal = (n) => {
+  const r = n % 100
+  if (r >= 11 && r <= 13) return `${n}th`
+  return `${n}${['th', 'st', 'nd', 'rd'][n % 10] || 'th'}`
+}
+
+const SIGN_LORDS = {
+  Aries: 'Mars', Taurus: 'Venus', Gemini: 'Mercury', Cancer: 'Moon',
+  Leo: 'Sun', Virgo: 'Mercury', Libra: 'Venus', Scorpio: 'Mars',
+  Sagittarius: 'Jupiter', Capricorn: 'Saturn', Aquarius: 'Saturn', Pisces: 'Jupiter',
+}
+
 /** Build a unified chart payload from multiple Hora API responses. */
 function buildChartPayload(name, birthData, rasi, panchanga, dasha, vargaCatalog, shodasavarga, aspects, yogas) {
-  const ordinal = (n) => {
-    const r = n % 100
-    if (r >= 11 && r <= 13) return `${n}th`
-    return `${n}${['th', 'st', 'nd', 'rd'][n % 10] || 'th'}`
-  }
-
-  const SIGN_LORDS = {
-    Aries: 'Mars', Taurus: 'Venus', Gemini: 'Mercury', Cancer: 'Moon',
-    Leo: 'Sun', Virgo: 'Mercury', Libra: 'Venus', Scorpio: 'Mars',
-    Sagittarius: 'Jupiter', Capricorn: 'Saturn', Aquarius: 'Saturn', Pisces: 'Jupiter',
-  }
 
   const planets = (rasi?.grahas || []).map((p) => {
     let lordHouses = p.lord_of_houses

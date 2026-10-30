@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
 import type { AstroChart, BirthData } from './types/astro'
 import { normalizeChartPayload } from './adapters/horaAdapter'
@@ -8,6 +8,12 @@ import { VargaWorkspace } from './components/vargas/VargaWorkspace'
 import { DashaTimeline } from './components/timing/DashaTimeline'
 import { AnalysisWorkspace } from './components/analysis/AnalysisWorkspace'
 import { ResearchWorkspace } from './components/research/ResearchWorkspace'
+import { LearnWorkspace } from './components/learn/LearnWorkspace'
+import { ContextualHelpModal } from './components/learn/ContextualHelpModal'
+import { CreateChartModal } from './components/modals/CreateChartModal'
+import { VedicCockpit } from './components/overview/VedicCockpit'
+import { AstrologicalRadar } from './components/overview/AstrologicalRadar'
+import { TechnicalTables } from './components/overview/TechnicalTables'
 import type { CalculationSettingsConfig } from './components/research/ConfigurationPanel'
 
 // ---------------------------------------------------------------------------
@@ -64,508 +70,6 @@ async function fetchJsonWithRetry(path: string, init?: RequestInit) {
 }
 
 // ---------------------------------------------------------------------------
-// City Database & Presets
-// ---------------------------------------------------------------------------
-
-import { CITIES_DATABASE, POPULAR_QUICK_CITIES, type CityOption } from './cities'
-
-const SAMPLE_PRESETS: { label: string; name: string; year: number; month: number; day: number; hour: number; minute: number; second: number; cityName: string }[] = [
-  { label: 'Sample Natal (Agra)', name: 'Sample Natal (Agra)', year: 1995, month: 8, day: 24, hour: 10, minute: 30, second: 0, cityName: 'Agra' },
-  { label: 'Lord Rama', name: 'Sri Rama (Chaitra Navami)', year: -5000, month: 1, day: 10, hour: 12, minute: 0, second: 0, cityName: 'Ayodhya' },
-  { label: 'Lord Krishna', name: 'Sri Krishna (Janmashtami)', year: -3228, month: 7, day: 19, hour: 0, minute: 0, second: 0, cityName: 'Mathura' },
-  { label: 'Mahatma Gandhi', name: 'Mahatma Gandhi', year: 1869, month: 10, day: 2, hour: 7, minute: 12, second: 0, cityName: 'Ahmedabad' },
-]
-
-// ---------------------------------------------------------------------------
-// Create chart modal
-// ---------------------------------------------------------------------------
-
-function CreateChartModal({
-  onClose,
-  onCreated,
-}: {
-  onClose: () => void
-  onCreated: (chart: any) => void
-}) {
-  const [form, setForm] = useState<BirthData>({
-    name: '',
-    year: 1995,
-    month: 8,
-    day: 24,
-    hour: 10,
-    minute: 30,
-    second: 0,
-    tz_name: 'Asia/Kolkata',
-    place: { latitude: 27.1767, longitude: 78.0081, altitude: 0, name: 'Agra' },
-  })
-
-  const [citySearchQuery, setCitySearchQuery] = useState<string>('Agra')
-  const [showDropdown, setShowDropdown] = useState(false)
-  const [showManualCoords, setShowManualCoords] = useState(false)
-  const [showGuide, setShowGuide] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [err, setErr] = useState('')
-
-  // Close on Escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
-
-  // Date format string (YYYY-MM-DD)
-  const dateString = `${String(form.year).padStart(4, '0')}-${String(form.month).padStart(2, '0')}-${String(form.day).padStart(2, '0')}`
-
-  // Time format string (HH:MM)
-  const timeString = `${String(form.hour).padStart(2, '0')}:${String(form.minute).padStart(2, '0')}`
-
-  const handleDateChange = (val: string) => {
-    if (!val) return
-    const [y, m, d] = val.split('-').map(Number)
-    if (y && m && d) {
-      setForm((prev) => ({ ...prev, year: y, month: m, day: d }))
-    }
-  }
-
-  const handleTimeChange = (val: string) => {
-    if (!val) return
-    const [h, m] = val.split(':').map(Number)
-    if (h !== undefined && m !== undefined) {
-      setForm((prev) => ({ ...prev, hour: h, minute: m, second: 0 }))
-    }
-  }
-
-  const handleSetCurrentTime = () => {
-    const now = new Date()
-    setForm((prev) => ({
-      ...prev,
-      year: now.getFullYear(),
-      month: now.getMonth() + 1,
-      day: now.getDate(),
-      hour: now.getHours(),
-      minute: now.getMinutes(),
-      second: now.getSeconds(),
-    }))
-  }
-
-  const handleSelectCity = (city: CityOption) => {
-    setCitySearchQuery(city.name)
-    setShowDropdown(false)
-    setForm((prev) => ({
-      ...prev,
-      tz_name: city.tz,
-      place: {
-        ...prev.place,
-        name: city.name,
-        latitude: city.lat,
-        longitude: city.lon,
-      },
-    }))
-  }
-
-  const filteredCities = useMemo(() => {
-    const q = citySearchQuery.trim().toLowerCase()
-    if (!q) return CITIES_DATABASE.slice(0, 10)
-    return CITIES_DATABASE.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.label.toLowerCase().includes(q) ||
-        c.stateOrCountry.toLowerCase().includes(q) ||
-        (c.region && c.region.toLowerCase().includes(q))
-    ).slice(0, 12)
-  }, [citySearchQuery])
-
-  const applyPreset = (preset: typeof SAMPLE_PRESETS[0]) => {
-    const match = CITIES_DATABASE.find((c) => c.name === preset.cityName)
-    const lat = match ? match.lat : 27.1767
-    const lon = match ? match.lon : 78.0081
-    const tz = match ? match.tz : 'Asia/Kolkata'
-
-    setForm({
-      name: preset.name,
-      year: preset.year,
-      month: preset.month,
-      day: preset.day,
-      hour: preset.hour,
-      minute: preset.minute,
-      second: preset.second,
-      tz_name: tz,
-      place: { name: preset.cityName, latitude: lat, longitude: lon, altitude: 0 },
-    })
-    setCitySearchQuery(preset.cityName)
-  }
-
-  const handleSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault()
-    const trimmedName = (form.name || '').trim()
-    if (!trimmedName) {
-      setErr('Please enter a name for the chart')
-      return
-    }
-    if (isNaN(form.place.latitude) || form.place.latitude < -90 || form.place.latitude > 90) {
-      setErr('Latitude must be between -90 and 90')
-      return
-    }
-    if (isNaN(form.place.longitude) || form.place.longitude < -180 || form.place.longitude > 180) {
-      setErr('Longitude must be between -180 and 180')
-      return
-    }
-
-    setSaving(true)
-    setErr('')
-    try {
-      const chart = await fetchJsonWithRetry('/api/charts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: trimmedName, birthData: { ...form, name: trimmedName } }),
-      })
-      onCreated(chart)
-    } catch (errCatch) {
-      setErr(errCatch instanceof Error ? errCatch.message : 'Failed to create chart')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  // Readable preview string
-  const formattedPreviewDate = `${String(form.day).padStart(2, '0')}/${String(form.month).padStart(2, '0')}/${form.year}`
-  const formattedPreviewTime = `${String(form.hour).padStart(2, '0')}:${String(form.minute).padStart(2, '0')}`
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content panel modal-friendly" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <div>
-            <h3>Cast New Kundli Chart</h3>
-            <p className="modal-subtitle">Enter birth details or select a quick preset below</p>
-          </div>
-          <button type="button" className="ghost-button modal-close-btn" onClick={onClose} aria-label="Close modal">
-            ✕
-          </button>
-        </div>
-
-        {/* Quick Presets Bar */}
-        <div className="preset-bar">
-          <span className="preset-label">⚡ Quick Presets:</span>
-          <button
-            type="button"
-            className="preset-chip chip-now"
-            onClick={handleSetCurrentTime}
-            title="Set date and time to Right Now"
-          >
-            🕒 Right Now
-          </button>
-          {SAMPLE_PRESETS.map((p) => (
-            <button
-              key={p.label}
-              type="button"
-              className="preset-chip"
-              onClick={() => applyPreset(p)}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-
-        <form onSubmit={handleSubmit} className="form-friendly-grid">
-          {/* Section 1: Chart Identity */}
-          <div className="form-card-section">
-            <label className="field-group">
-              <span className="field-label">Chart Name / Person</span>
-              <input
-                autoFocus
-                type="text"
-                className="input-enhanced"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="e.g. John Doe, Prashna Chart, etc."
-                required
-              />
-            </label>
-          </div>
-
-          {/* Section 2: Date & Time */}
-          <div className="form-card-section">
-            <div className="section-title-row">
-              <span className="field-label">Date & Time of Birth</span>
-              <button
-                type="button"
-                className="mini-text-btn"
-                onClick={handleSetCurrentTime}
-              >
-                Set to Present Moment
-              </button>
-            </div>
-
-            <div className="datetime-split-grid">
-              <label className="field-group">
-                <span className="field-sublabel">Date</span>
-                <input
-                  type="date"
-                  className="input-enhanced"
-                  value={dateString}
-                  onChange={(e) => handleDateChange(e.target.value)}
-                  required
-                />
-              </label>
-
-              <label className="field-group">
-                <span className="field-sublabel">Time (24h)</span>
-                <input
-                  type="time"
-                  step="1"
-                  className="input-enhanced"
-                  value={timeString}
-                  onChange={(e) => handleTimeChange(e.target.value)}
-                  required
-                />
-              </label>
-            </div>
-          </div>
-
-          {/* Section 3: Place & Location */}
-          <div className="form-card-section">
-            <div className="section-title-row">
-              <span className="field-label">Birth Place / City (India & Global)</span>
-              <button
-                type="button"
-                className="mini-text-btn"
-                onClick={() => setShowManualCoords(!showManualCoords)}
-              >
-                {showManualCoords ? 'Hide Lat/Lon Fields' : '✏️ Fine-tune Coordinates'}
-              </button>
-            </div>
-
-            {/* Quick City Shortcut Chips */}
-            <div className="quick-city-chips">
-              <span style={{ fontSize: '0.74rem', color: '#e5c07b', fontWeight: 600 }}>Quick:</span>
-              {POPULAR_QUICK_CITIES.map((cityName) => {
-                const city = CITIES_DATABASE.find((c) => c.name === cityName)
-                if (!city) return null
-                const isSelected = form.place.name.toLowerCase() === cityName.toLowerCase()
-                return (
-                  <button
-                    key={cityName}
-                    type="button"
-                    className={`quick-city-chip ${isSelected ? 'active' : ''}`}
-                    onClick={() => handleSelectCity(city)}
-                  >
-                    📍 {cityName}
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* Searchable City Input with Autocomplete Dropdown */}
-            <div className="city-search-box">
-              <div className="city-search-input-wrap">
-                <span className="city-search-icon">🔍</span>
-                <input
-                  type="text"
-                  className="input-enhanced city-search-input"
-                  value={citySearchQuery}
-                  placeholder="Search city: Agra, Hathras, Aligarh, Mathura, Lucknow..."
-                  onChange={(e) => {
-                    setCitySearchQuery(e.target.value)
-                    setShowDropdown(true)
-                  }}
-                  onFocus={() => setShowDropdown(true)}
-                />
-                {citySearchQuery && (
-                  <button
-                    type="button"
-                    className="city-search-clear"
-                    onClick={() => {
-                      setCitySearchQuery('')
-                      setShowDropdown(true)
-                    }}
-                    title="Clear search"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-
-              {/* Suggestions Dropdown */}
-              {showDropdown && (
-                <div className="city-dropdown-menu">
-                  {filteredCities.map((c) => (
-                    <div
-                      key={c.label}
-                      className={`city-dropdown-item ${form.place.name === c.name ? 'selected' : ''}`}
-                      onClick={() => handleSelectCity(c)}
-                    >
-                      <div className="city-item-main">
-                        <span className="city-item-name">
-                          📍 {c.name}
-                        </span>
-                        <span className="city-item-state">
-                          {c.label}
-                        </span>
-                      </div>
-                      <span className="city-item-coords">
-                        {c.lat.toFixed(2)}° N, {c.lon.toFixed(2)}° E
-                      </span>
-                    </div>
-                  ))}
-
-                  {/* Custom city option */}
-                  {citySearchQuery.trim() && (
-                    <div
-                      className="city-dropdown-custom"
-                      onClick={() => {
-                        setForm((prev) => ({
-                          ...prev,
-                          place: { ...prev.place, name: citySearchQuery.trim() },
-                        }))
-                        setShowDropdown(false)
-                        setShowManualCoords(true)
-                      }}
-                    >
-                      ➕ Use "<strong>{citySearchQuery.trim()}</strong>" as custom location (click to set coordinates)
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Selected Location Pill & Google Maps Helper */}
-            <div className="coords-helper-bar">
-              <div className="location-badge-pill" style={{ margin: 0 }}>
-                <span>📍 {form.place.name || 'Custom'}</span>
-                <span>•</span>
-                <span>{form.place.latitude.toFixed(4)}° N, {form.place.longitude.toFixed(4)}° E</span>
-                <span>•</span>
-                <span>⏱️ {form.tz_name}</span>
-              </div>
-              <a
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(form.place.name ? `${form.place.name}, India` : 'Agra, India')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="google-maps-btn"
-                title="Search this city on Google Maps in a new tab"
-              >
-                🗺️ Find on Google Maps ↗
-              </a>
-            </div>
-
-            {/* Manual Lat/Lon/Timezone Fields */}
-            {showManualCoords && (
-              <div className="advanced-location-drawer">
-                <div className="coords-grid-enhanced">
-                  <label className="field-group">
-                    <span className="field-sublabel">Latitude (° N for India)</span>
-                    <input
-                      type="number"
-                      step="0.0001"
-                      className="input-enhanced"
-                      value={form.place.latitude}
-                      onChange={(e) => setForm({ ...form, place: { ...form.place, latitude: parseFloat(e.target.value) || 0 } })}
-                    />
-                  </label>
-
-                  <label className="field-group">
-                    <span className="field-sublabel">Longitude (° E for India)</span>
-                    <input
-                      type="number"
-                      step="0.0001"
-                      className="input-enhanced"
-                      value={form.place.longitude}
-                      onChange={(e) => setForm({ ...form, place: { ...form.place, longitude: parseFloat(e.target.value) || 0 } })}
-                    />
-                  </label>
-
-                  <label className="field-group">
-                    <span className="field-sublabel">Timezone</span>
-                    <input
-                      type="text"
-                      className="input-enhanced"
-                      value={form.tz_name}
-                      onChange={(e) => setForm({ ...form, tz_name: e.target.value })}
-                      placeholder="Asia/Kolkata"
-                    />
-                  </label>
-                </div>
-              </div>
-            )}
-
-            {/* Collapsible Coordinates Finder Guide */}
-            <div className="coords-guide-box">
-              <button
-                type="button"
-                className="coords-guide-header"
-                onClick={() => setShowGuide(!showGuide)}
-              >
-                <span>💡 How to get Latitude & Longitude for ANY village or city in India?</span>
-                <span>{showGuide ? '▲' : '▼'}</span>
-              </button>
-              {showGuide && (
-                <div className="coords-guide-body">
-                  <div className="coords-guide-step">
-                    <span className="step-num">1</span>
-                    <div>
-                      <strong>Google Maps (Fastest & Accurate to any street/hospital):</strong>
-                      <p>
-                        Open Google Maps on your phone or PC. Search for your village, mohalla, or hospital (e.g. <em>Sadabad</em>, <em>Sasni</em>, <em>Dayalbagh</em>, or <em>Khandari</em>). <strong>Right-click</strong> on the map (or <strong>tap & hold</strong> on phone screen). The top item shows coordinates like <code>27.5968, 78.0519</code>. Click to copy and paste directly into Latitude & Longitude above!
-                      </p>
-                    </div>
-                  </div>
-                  <div className="coords-guide-step">
-                    <span className="step-num">2</span>
-                    <div>
-                      <strong>Google Search:</strong>
-                      <p>
-                        Simply search on Google: <code>latitude of [City/Village name]</code>. Example: searching <em>latitude of Hathras</em> immediately displays <strong>27.5968° N, 78.0519° E</strong>.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="india-bounds-box">
-                    <strong>🇮🇳 Quick Rules for India Coordinates:</strong>
-                    <div>• <strong>Latitude:</strong> Always positive (+) between <strong>8.4° N and 37.6° N</strong></div>
-                    <div>• <strong>Longitude:</strong> Always positive (+) between <strong>68.7° E and 97.25° E</strong></div>
-                    <div>• <strong>Timezone:</strong> Always <code>Asia/Kolkata</code> (Indian Standard Time, UTC +5:30) for all of India</div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Live Preview Card */}
-          <div className="chart-preview-card">
-            <div className="preview-indicator">
-              <span className="preview-dot" />
-              <strong>Preview:</strong> {(form.name || '').trim() || 'New Chart'}
-            </div>
-            <div className="preview-summary">
-              📅 {formattedPreviewDate} at {formattedPreviewTime} • 📍 {form.place.name || 'Location'} ({form.tz_name})
-            </div>
-          </div>
-
-          {err && <div className="form-error-banner">⚠️ {err}</div>}
-
-          {saving && (
-            <div className="loading-bar">
-              <span />
-            </div>
-          )}
-
-          <div className="modal-actions">
-            <button type="button" className="ghost-button" onClick={onClose} disabled={saving}>
-              Cancel
-            </button>
-            <button type="submit" className="primary-button submit-btn-enhanced" disabled={saving}>
-              {saving ? 'Computing Vedic Chart...' : '✨ Calculate & Generate Kundli'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // App
 // ---------------------------------------------------------------------------
 
@@ -580,6 +84,7 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [helpTermId, setHelpTermId] = useState<string | null>(null)
   const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline'>('checking')
 
   // Check backend health on mount
@@ -763,7 +268,7 @@ function App() {
             >
               <span>{item}</span>
               <span className="nav-count">
-                {item === 'Overview' ? '01' : item === 'Charts' ? String(savedCharts.length).padStart(2, '0') : item === 'Analysis' ? '04' : item === 'Research' ? '03' : '—'}
+                {item === 'Overview' ? '01' : item === 'Charts' ? String(savedCharts.length).padStart(2, '0') : item === 'Analysis' ? '04' : item === 'Research' ? '03' : item === 'Learn' ? '02' : '—'}
               </span>
             </button>
           ))}
@@ -814,41 +319,31 @@ function App() {
           </div>
         </header>
 
-        <section className="summary-grid">
-          <article className="summary-card panel">
-            <p className="eyebrow">Lagna</p>
-            <strong>{chart.quickFacts.lagna}</strong>
-            <span>Ascendant ({chart.quickFacts.lagnaDms})</span>
-          </article>
-          <article className="summary-card panel">
-            <p className="eyebrow">Moon</p>
-            <strong>{chart.quickFacts.moonSign}</strong>
-            <span>{chart.quickFacts.moonNakshatra}</span>
-          </article>
-          <article className="summary-card panel">
-            <p className="eyebrow">Current Dasha</p>
-            <strong>{chart.quickFacts.currentMahadasha}</strong>
-            <span>{chart.quickFacts.currentAntardasha ? `AD: ${chart.quickFacts.currentAntardasha}` : 'Vimshottari'}</span>
-          </article>
-          <article className="summary-card panel">
-            <p className="eyebrow">Ayanamsha</p>
-            <strong>{chart.metadata.ayanamsaName}</strong>
-            <span>{chart.metadata.ayanamsaDms}</span>
-          </article>
-        </section>
+        <VedicCockpit
+          chart={chart}
+          onSelectPlanet={(pName) => {
+            setSelectedPlanet(pName)
+            setInspectorTab('planet')
+          }}
+          onSelectHouse={(hNum) => {
+            setSelectedHouse(hNum)
+            setInspectorTab('house')
+          }}
+          onNavigateToAnalysis={() => setSelectedNav('Analysis')}
+          onNavigateToTiming={() => setSelectedNav('Timing')}
+        />
 
         {selectedNav === 'Overview' && (
           <>
             <section className="main-panel panel">
               <div className="section-heading">
                 <div>
-                  <p className="eyebrow">Birth information</p>
-                  <h3>{chart.metadata.dateFormatted}</h3>
+                  <p className="eyebrow">Astronomical Epoch & Coordinates</p>
+                  <h3>{chart.metadata.dateFormatted} • {chart.metadata.timeFormatted}</h3>
                 </div>
                 <div className="meta-block">
-                  <span>{chart.metadata.timeFormatted}</span>
-                  <span>{chart.metadata.location}</span>
-                  <span>{chart.metadata.timezone}</span>
+                  <span>📍 {chart.metadata.location} ({chart.metadata.latitude}, {chart.metadata.longitude})</span>
+                  <span>🌐 {chart.metadata.timezone} • {chart.metadata.ayanamsaName} ({chart.metadata.ayanamsaDms})</span>
                 </div>
               </div>
 
@@ -870,381 +365,44 @@ function App() {
                   />
                 </div>
 
-                <div className="facts-column">
-                  <div className="facts-box">
-                    <p className="eyebrow">Quick facts</p>
-                    <ul>
-                      <li><span>Ascendant</span><strong>{chart.quickFacts.lagna} {chart.quickFacts.lagnaDms}</strong></li>
-                      <li><span>Moon sign</span><strong>{chart.quickFacts.moonSign}</strong></li>
-                      <li><span>Sun sign</span><strong>{chart.quickFacts.sunSign}</strong></li>
-                      <li><span>Moon Nakshatra</span><strong>{chart.quickFacts.moonNakshatra} (Pada {chart.quickFacts.moonPada})</strong></li>
-                      <li><span>Current Mahadasha</span><strong>{chart.quickFacts.currentMahadasha}</strong></li>
-                    </ul>
-                  </div>
-                  <div className="facts-box">
-                    <p className="eyebrow">Explore</p>
-                    <div className="chip-grid">
-                      <button
-                        type="button"
-                        className={`chip-button ${tableTab === 'houses' ? 'selected' : ''}`}
-                        onClick={() => {
-                          setInspectorTab('house')
-                          setTableTab('houses')
-                        }}
-                      >
-                        🏛️ Houses
-                      </button>
-                      <button
-                        type="button"
-                        className={`chip-button ${tableTab === 'planets' ? 'selected' : ''}`}
-                        onClick={() => {
-                          setInspectorTab('planet')
-                          setTableTab('planets')
-                        }}
-                      >
-                        🪐 Planets
-                      </button>
-                      <button type="button" className="chip-button" onClick={() => setSelectedNav('Charts')}>
-                        Vargas
-                      </button>
-                      <button type="button" className="chip-button" onClick={() => setSelectedNav('Timing')}>
-                        Dashas
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                <AstrologicalRadar
+                  chart={chart}
+                  tableTab={tableTab}
+                  onSelectTableTab={(tab) => {
+                    setTableTab(tab)
+                    setInspectorTab(tab === 'planets' ? 'planet' : 'house')
+                  }}
+                  onSelectPlanet={(pName) => {
+                    setSelectedPlanet(pName)
+                    setInspectorTab('planet')
+                  }}
+                  onSelectHouse={(hNum) => {
+                    setSelectedHouse(hNum)
+                    setInspectorTab('house')
+                  }}
+                  onNavigateToNav={(nav) => setSelectedNav(nav)}
+                />
               </div>
             </section>
 
-            <section className="lower-grid">
-              <div className="panel" style={{ overflowX: 'auto' }}>
-                <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <h3 style={{ margin: 0 }}>
-                      {tableTab === 'planets' ? 'Planetary Positions' : 'House Placements (Bhavas)'}
-                    </h3>
-                    <span className="eyebrow">
-                      {tableTab === 'planets' ? '9 Grahas + Lagna' : '12 Classical Bhavas'}
-                    </span>
-                  </div>
-
-                  {/* Toggle tabs for inspection table */}
-                  <div className="segmented-control" style={{ display: 'flex', background: 'rgba(30, 41, 59, 0.7)', borderRadius: 6, padding: 2, border: '1px solid rgba(148, 163, 184, 0.25)' }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setTableTab('planets')
-                        setInspectorTab('planet')
-                      }}
-                      style={{
-                        padding: '4px 10px',
-                        fontSize: '0.74rem',
-                        border: 'none',
-                        borderRadius: 4,
-                        cursor: 'pointer',
-                        background: tableTab === 'planets' ? '#d97706' : 'transparent',
-                        color: tableTab === 'planets' ? '#fff' : '#94a3b8',
-                        fontWeight: tableTab === 'planets' ? 600 : 400,
-                      }}
-                    >
-                      🪐 Planets ({chart.planets.length})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setTableTab('houses')
-                        setInspectorTab('house')
-                      }}
-                      style={{
-                        padding: '4px 10px',
-                        fontSize: '0.74rem',
-                        border: 'none',
-                        borderRadius: 4,
-                        cursor: 'pointer',
-                        background: tableTab === 'houses' ? '#d97706' : 'transparent',
-                        color: tableTab === 'houses' ? '#fff' : '#94a3b8',
-                        fontWeight: tableTab === 'houses' ? 600 : 400,
-                      }}
-                    >
-                      🏛️ Houses (12)
-                    </button>
-                  </div>
-                </div>
-
-                {tableTab === 'planets' ? (
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Planet</th>
-                        <th>Longitude</th>
-                        <th>Sign (Rashi)</th>
-                        <th>House</th>
-                        <th>Lord of Houses</th>
-                        <th>Dignity</th>
-                        <th>Nakshatra</th>
-                        <th>Chara Karaka</th>
-                        <th>Role</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {chart.planets.map((planet) => {
-                        const isSelected = selectedPlanet === planet.name && inspectorTab === 'planet'
-                        return (
-                          <tr
-                            key={planet.name}
-                            onClick={() => {
-                              setSelectedPlanet(planet.name)
-                              setInspectorTab('planet')
-                            }}
-                            style={{
-                              cursor: 'pointer',
-                              background: isSelected ? 'rgba(217, 119, 6, 0.18)' : undefined,
-                              borderLeft: isSelected ? '3px solid #d97706' : undefined,
-                            }}
-                            title="Click to inspect this planet in the Object Inspector"
-                          >
-                            <td>
-                              <span style={{ marginRight: 6, color: '#fbbf24' }}>{planet.symbol}</span>
-                              <strong>{planet.name}</strong> <small style={{ color: '#94a3b8' }}>({planet.sanskritName})</small>
-                              {planet.retrograde && <span style={{ color: '#f59e0b', marginLeft: 4, fontWeight: 'bold' }}>[R]</span>}
-                              {planet.combust && <span style={{ color: '#ef4444', marginLeft: 2, fontWeight: 'bold' }} title="Combust with Sun">*</span>}
-                            </td>
-                            <td>{planet.dms}</td>
-                            <td>{planet.sign}</td>
-                            <td>
-                              <span
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setSelectedHouse(planet.houseNumber)
-                                  setInspectorTab('house')
-                                  setTableTab('houses')
-                                }}
-                                style={{ color: '#38bdf8', textDecoration: 'underline' }}
-                                title={`Jump to House ${planet.houseNumber}`}
-                              >
-                                {planet.houseOrdinal}
-                              </span>
-                            </td>
-                            <td>
-                              {planet.lordOfHouses && planet.lordOfHouses.length > 0 ? (
-                                <span style={{ color: '#38bdf8', fontWeight: 600 }}>
-                                  {planet.lordOfHouses.map((h) => `${h}th`).join(' & ')}
-                                </span>
-                              ) : (
-                                <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Node / Shadow</span>
-                              )}
-                            </td>
-                            <td>
-                              <span
-                                style={{
-                                  padding: '2px 6px',
-                                  borderRadius: 4,
-                                  fontSize: '0.72rem',
-                                  fontWeight: 600,
-                                  background:
-                                    planet.dignity === 'Exalted'
-                                      ? 'rgba(251, 191, 36, 0.15)'
-                                      : planet.dignity === 'Own Sign'
-                                      ? 'rgba(52, 211, 153, 0.15)'
-                                      : planet.dignity === 'Debilitated'
-                                      ? 'rgba(248, 113, 113, 0.15)'
-                                      : 'rgba(255, 255, 255, 0.05)',
-                                  color:
-                                    planet.dignity === 'Exalted'
-                                      ? '#fbbf24'
-                                      : planet.dignity === 'Own Sign'
-                                      ? '#34d399'
-                                      : planet.dignity === 'Debilitated'
-                                      ? '#f87171'
-                                      : '#cbd5e1',
-                                }}
-                              >
-                                {planet.dignity}
-                              </span>
-                            </td>
-                            <td>
-                              <span style={{ fontSize: '0.78rem' }}>
-                                {planet.nakshatra} (P{planet.pada})
-                              </span>
-                            </td>
-                            <td>
-                              {planet.charaKarakaCode ? (
-                                <span
-                                  style={{
-                                    padding: '2px 5px',
-                                    borderRadius: 4,
-                                    fontSize: '0.72rem',
-                                    background: 'rgba(217, 119, 6, 0.15)',
-                                    color: '#f59e0b',
-                                    fontWeight: 700,
-                                  }}
-                                  title={planet.charaKaraka}
-                                >
-                                  {planet.charaKarakaCode}
-                                </span>
-                              ) : (
-                                <span style={{ color: '#64748b' }}>—</span>
-                              )}
-                            </td>
-                            <td>
-                              <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
-                                {planet.functionalType || 'Neutral'}
-                              </span>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                ) : (
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Bhava (House)</th>
-                        <th>Sign (Rashi)</th>
-                        <th>House Lord</th>
-                        <th>Lord's Placement</th>
-                        <th>Occupants</th>
-                        <th>Aspects Received</th>
-                        <th>Natural Karaka</th>
-                        <th>Classification</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {chart.houses.map((house) => {
-                        const isSelected = selectedHouse === house.number && inspectorTab === 'house'
-                        const lordPlanet = chart.planets.find((p) => p.name === house.lord)
-                        return (
-                          <tr
-                            key={house.number}
-                            onClick={() => {
-                              setSelectedHouse(house.number)
-                              setInspectorTab('house')
-                            }}
-                            style={{
-                              cursor: 'pointer',
-                              background: isSelected ? 'rgba(56, 189, 248, 0.15)' : undefined,
-                              borderLeft: isSelected ? '3px solid #38bdf8' : undefined,
-                            }}
-                            title="Click to inspect this house in the Object Inspector"
-                          >
-                            <td>
-                              <strong style={{ color: '#38bdf8' }}>H{house.number}</strong>{' '}
-                              <span style={{ fontSize: '0.8rem', color: '#f8fafc' }}>
-                                {house.name.replace(' House', '')}
-                              </span>
-                              {house.sanskritName && (
-                                <small style={{ display: 'block', color: '#94a3b8', fontSize: '0.7rem' }}>
-                                  {house.sanskritName.split(' (')[0]}
-                                </small>
-                              )}
-                            </td>
-                            <td>
-                              <strong>{house.sign}</strong>
-                              <small style={{ display: 'block', color: '#94a3b8', fontSize: '0.7rem' }}>
-                                Sign {house.signNumber}
-                              </small>
-                            </td>
-                            <td>
-                              <span
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  if (lordPlanet) {
-                                    setSelectedPlanet(lordPlanet.name)
-                                    setInspectorTab('planet')
-                                    setTableTab('planets')
-                                  }
-                                }}
-                                style={{ color: '#fbbf24', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
-                                title={`Inspect Lord ${house.lord}`}
-                              >
-                                {house.lord} ↗
-                              </span>
-                            </td>
-                            <td>
-                              {lordPlanet ? (
-                                <span style={{ fontSize: '0.78rem', color: '#cbd5e1' }}>
-                                  In <strong>{lordPlanet.houseOrdinal}</strong> ({lordPlanet.sign})
-                                </span>
-                              ) : (
-                                <span style={{ color: '#94a3b8' }}>—</span>
-                              )}
-                            </td>
-                            <td>
-                              {house.occupants.length > 0 ? (
-                                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                                  {house.occupants.map((occ) => (
-                                    <span
-                                      key={occ}
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        setSelectedPlanet(occ)
-                                        setInspectorTab('planet')
-                                        setTableTab('planets')
-                                      }}
-                                      style={{
-                                        background: 'rgba(255, 255, 255, 0.08)',
-                                        color: '#f8fafc',
-                                        padding: '1px 5px',
-                                        borderRadius: 4,
-                                        fontSize: '0.72rem',
-                                        cursor: 'pointer',
-                                      }}
-                                    >
-                                      {occ}
-                                    </span>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span style={{ color: '#64748b', fontStyle: 'italic', fontSize: '0.75rem' }}>Empty</span>
-                              )}
-                            </td>
-                            <td>
-                              {house.aspectsReceived && house.aspectsReceived.length > 0 ? (
-                                <span style={{ fontSize: '0.74rem', color: '#cbd5e1' }}>
-                                  {house.aspectsReceived.map((a) => a.planet).join(', ')}
-                                </span>
-                              ) : (
-                                <span style={{ color: '#64748b', fontSize: '0.75rem' }}>None</span>
-                              )}
-                            </td>
-                            <td>
-                              <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
-                                {house.naturalKaraka?.split(' ')[0] || '—'}
-                              </span>
-                            </td>
-                            <td>
-                              <span style={{ fontSize: '0.72rem', color: '#e2e8f0' }}>
-                                {house.categories.slice(0, 2).map((c) => c.split(' (')[0]).join(', ')}
-                              </span>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-
-              <div className="panel">
-                <div className="section-header">
-                  <h3>Vimshottari</h3>
-                  <button type="button" className="text-button" onClick={() => setSelectedNav('Timing')}>Timeline →</button>
-                </div>
-                <div className="dasha-stack">
-                  {chart.dashaTree.slice(0, 5).map((dasha: any, idx: number) => (
-                    <div key={dasha.lord || dasha.period || idx} className="dasha-item">
-                      <span className="dot" style={{ background: ['#c9a66b', '#7ec8c9', '#ed9e7a', '#a67ec9', '#7ec98a'][idx % 5] }} />
-                      <div>
-                        <strong>{dasha.lord || dasha.period || dasha.lord_name}</strong>
-                        <small>Mahadasha</small>
-                      </div>
-                      <span>{dasha.start?.slice?.(0, 10) || '—'} → {dasha.end?.slice?.(0, 10) || '—'}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </section>
+            <TechnicalTables
+              chart={chart}
+              tableTab={tableTab}
+              selectedPlanet={selectedPlanet}
+              selectedHouse={selectedHouse}
+              onSelectTableTab={(tab) => {
+                setTableTab(tab)
+                setInspectorTab(tab === 'planets' ? 'planet' : 'house')
+              }}
+              onSelectPlanet={(pName) => {
+                setSelectedPlanet(pName)
+                setInspectorTab('planet')
+              }}
+              onSelectHouse={(hNum) => {
+                setSelectedHouse(hNum)
+                setInspectorTab('house')
+              }}
+            />
           </>
         )}
 
@@ -1336,6 +494,10 @@ function App() {
             isRecalculating={loading}
           />
         )}
+
+        {selectedNav === 'Learn' && (
+          <LearnWorkspace chart={chart} />
+        )}
       </main>
 
       <UniversalInspector
@@ -1352,6 +514,7 @@ function App() {
           setSelectedHouse(hNum)
           setInspectorTab('house')
         }}
+        onOpenHelp={setHelpTermId}
       />
 
       {showCreateModal && (
@@ -1362,6 +525,19 @@ function App() {
             applyChart(newChart)
             setSelectedNav('Overview')
             setShowCreateModal(false)
+          }}
+          fetchJsonWithRetry={fetchJsonWithRetry}
+        />
+      )}
+
+      {helpTermId && chart && (
+        <ContextualHelpModal
+          termId={helpTermId}
+          chart={chart}
+          onClose={() => setHelpTermId(null)}
+          onNavigateToGlossary={() => {
+            setHelpTermId(null)
+            setSelectedNav('Learn')
           }}
         />
       )}

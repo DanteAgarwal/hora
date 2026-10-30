@@ -11,6 +11,7 @@ interface UniversalInspectorProps {
   onChangeTab: (tab: 'planet' | 'house') => void
   onSelectPlanet: (planetName: string) => void
   onSelectHouse: (houseNumber: number) => void
+  onOpenHelp?: (termId: string) => void
 }
 
 export const UniversalInspector: React.FC<UniversalInspectorProps> = ({
@@ -21,6 +22,7 @@ export const UniversalInspector: React.FC<UniversalInspectorProps> = ({
   onChangeTab,
   onSelectPlanet,
   onSelectHouse,
+  onOpenHelp,
 }) => {
   const planet = chart.planets.find((p) => p.name === selectedPlanetName) || chart.planets[0]
   const house = chart.houses.find((h) => h.number === selectedHouseNumber) || chart.houses[0]
@@ -89,6 +91,7 @@ export const UniversalInspector: React.FC<UniversalInspectorProps> = ({
               onSelectPlanet(pName)
               onChangeTab('planet')
             }}
+            onOpenHelp={onOpenHelp}
           />
         )}
 

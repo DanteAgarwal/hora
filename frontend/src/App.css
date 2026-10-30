@@ -241,8 +241,14 @@
 
 .chart-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(260px, 0.85fr);
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 1fr);
   gap: 18px;
+}
+
+@media (max-width: 1280px) {
+  .chart-layout {
+    grid-template-columns: 1fr;
+  }
 }
 
 .chart-board {
@@ -1486,4 +1492,1011 @@ tbody tr:hover {
 .dasha-table-mode tr:hover td {
   background: rgba(148, 163, 184, 0.06);
 }
+
+/* ---------------------------------------------------------------------------
+ * High-Information Density "At A Glance" Vedic Cockpit
+ * --------------------------------------------------------------------------- */
+
+.vedic-cockpit-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+
+@media (max-width: 1400px) {
+  .vedic-cockpit-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .vedic-cockpit-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cockpit-card {
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(17, 24, 39, 0.85), rgba(11, 15, 25, 0.9));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cockpit-card:hover {
+  border-color: rgba(245, 158, 11, 0.3);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+}
+
+.lagna-card { border-top: 2px solid #0ea5e9; }
+.moon-card  { border-top: 2px solid #93c5fd; }
+.sun-card   { border-top: 2px solid #f59e0b; }
+.timing-card { border-top: 2px solid #10b981; }
+.scoreboard-card { border-top: 2px solid #a855f7; }
+
+.cockpit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cockpit-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08rem;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.cockpit-pill .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.lagna-pill { color: #38bdf8; background: rgba(14, 165, 233, 0.12); }
+.lagna-pill .dot { background: #38bdf8; }
+
+.moon-pill { color: #93c5fd; background: rgba(147, 197, 253, 0.12); }
+.moon-pill .dot { background: #93c5fd; }
+
+.sun-pill { color: #f59e0b; background: rgba(245, 158, 11, 0.12); }
+.sun-pill .dot { background: #f59e0b; }
+
+.timing-pill { color: #34d399; background: rgba(16, 185, 129, 0.12); }
+.timing-pill .dot { background: #34d399; }
+
+.scoreboard-pill { color: #c084fc; background: rgba(168, 85, 247, 0.12); }
+.scoreboard-pill .dot { background: #c084fc; }
+
+.sign-symbol {
+  font-size: 1.15rem;
+  color: #fbbf24;
+  opacity: 0.85;
+}
+
+.timing-action {
+  font-size: 0.72rem;
+  color: #34d399;
+  font-weight: 600;
+}
+
+.yogas-pill-action {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.yogas-pill-action:hover {
+  background: rgba(245, 158, 11, 0.35);
+  transform: scale(1.05);
+}
+
+.cockpit-main-value {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sign-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #f8fafc;
+  letter-spacing: -0.02em;
+}
+
+.degree-badge {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.12);
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.cockpit-sub-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 8px;
+}
+
+.metric-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.74rem;
+}
+
+.metric-row .label {
+  color: #94a3b8;
+}
+
+.interactive-value {
+  color: #38bdf8;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.interactive-value:hover {
+  text-decoration: underline;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot-exalted { background: #fbbf24; box-shadow: 0 0 4px #fbbf24; }
+.dot-own-sign, .dot-moolatrikona { background: #34d399; box-shadow: 0 0 4px #34d399; }
+.dot-debilitated { background: #f87171; box-shadow: 0 0 4px #f87171; }
+.dot-friend, .dot-great-friend { background: #60a5fa; }
+
+.element-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.element-fire { color: #f97316; background: rgba(249, 115, 22, 0.12); }
+.element-earth { color: #84cc16; background: rgba(132, 204, 22, 0.12); }
+.element-air { color: #38bdf8; background: rgba(56, 189, 248, 0.12); }
+.element-water { color: #60a5fa; background: rgba(96, 165, 250, 0.12); }
+
+.highlight-text {
+  color: #f1f5f9;
+  font-weight: 600;
+}
+
+.tithi-badge {
+  color: #93c5fd;
+  font-weight: 600;
+}
+
+.dasha-flow-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dasha-node {
+  display: flex;
+  flex-direction: column;
+}
+
+.dasha-node small {
+  font-size: 0.65rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+.dasha-node strong {
+  font-size: 0.95rem;
+  color: #34d399;
+}
+
+.flow-arrow {
+  color: #64748b;
+  font-size: 1.1rem;
+}
+
+.dasha-progress-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.progress-bar-bg {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #34d399);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.progress-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  color: #94a3b8;
+}
+
+.karaka-pills-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.karaka-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.karaka-chip:hover {
+  border-color: #fbbf24;
+  background: rgba(30, 41, 59, 0.9);
+}
+
+.karaka-code {
+  font-weight: 800;
+  color: #fbbf24;
+  font-size: 0.68rem;
+}
+
+.karaka-name {
+  color: #f1f5f9;
+  font-weight: 500;
+}
+
+.dignity-badge-strip {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.mini-dignity-badge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.badge-exalted { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+.badge-own { background: rgba(52, 211, 153, 0.15); color: #34d399; }
+.badge-debilitated { background: rgba(248, 113, 113, 0.15); color: #f87171; }
+.badge-retro { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.badge-combust { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+
+/* ---------------------------------------------------------------------------
+ * Astrological Radar Component Styles
+ * --------------------------------------------------------------------------- */
+
+.astrological-radar-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: rgba(17, 24, 39, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 16px;
+}
+
+.radar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.radar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.info-tag {
+  font-size: 0.68rem;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.radar-pillars-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.pillar-card {
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kendra-pillar { border-left: 3px solid #38bdf8; }
+.trikona-pillar { border-left: 3px solid #fbbf24; }
+.dusthana-pillar { border-left: 3px solid #f87171; }
+.upachaya-pillar { border-left: 3px solid #34d399; }
+
+.pillar-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pillar-icon {
+  font-size: 1rem;
+}
+
+.pillar-label {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.pillar-label strong {
+  font-size: 0.75rem;
+  color: #f1f5f9;
+}
+
+.pillar-label small {
+  font-size: 0.65rem;
+  color: #94a3b8;
+}
+
+.count-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: #e2e8f0;
+}
+
+.planet-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.radar-planet-btn {
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 2px 6px;
+  color: #f1f5f9;
+  font-size: 0.72rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.radar-planet-btn:hover {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: #f59e0b;
+}
+
+.radar-planet-btn small {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.empty-indicator {
+  font-size: 0.7rem;
+  color: #64748b;
+  font-style: italic;
+}
+
+.alerts-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.state-alert-card {
+  flex: 1;
+  min-width: 120px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.retro-alert {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.combust-alert {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.state-alert-card .alert-badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+
+.retro-alert .alert-badge { color: #f59e0b; }
+.combust-alert .alert-badge { color: #ef4444; }
+
+.state-alert-card strong {
+  font-size: 0.8rem;
+  color: #f8fafc;
+}
+
+.state-alert-card small {
+  font-size: 0.68rem;
+  color: #94a3b8;
+}
+
+.panchanga-capsule-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.panchanga-capsule {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 4px 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+.cap-label {
+  font-size: 0.65rem;
+  color: #94a3b8;
+}
+
+.panchanga-capsule strong {
+  font-size: 0.76rem;
+  color: #e2e8f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.quick-nav-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.quick-nav-btn {
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.quick-nav-btn:hover,
+.quick-nav-btn.active {
+  background: rgba(217, 119, 6, 0.2);
+  border-color: #d97706;
+  color: #fbbf24;
+}
+
+/* ---------------------------------------------------------------------------
+ * Technical Tables Component Styles
+ * --------------------------------------------------------------------------- */
+
+.technical-tables-container {
+  padding: 18px 20px;
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.table-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.table-heading-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.table-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.table-title-row h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #f8fafc;
+}
+
+.table-count-badge {
+  font-size: 0.72rem;
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.table-subtitle {
+  margin: 0;
+  font-size: 0.76rem;
+  color: #94a3b8;
+}
+
+.planet-filter-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-bottom: 4px;
+}
+
+.filter-label {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  font-weight: 600;
+  margin-right: 2px;
+}
+
+.filter-chip {
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.filter-chip:hover {
+  background: rgba(30, 41, 59, 0.9);
+  color: #fff;
+}
+
+.filter-chip.active {
+  background: rgba(217, 119, 6, 0.25);
+  border-color: #d97706;
+  color: #fbbf24;
+}
+
+.table-scroll-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.astro-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+.astro-data-table th {
+  background: rgba(15, 23, 42, 0.95);
+  color: #94a3b8;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  white-space: nowrap;
+}
+
+.astro-data-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  vertical-align: middle;
+}
+
+.table-row {
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.table-row:hover td {
+  background: rgba(148, 163, 184, 0.05);
+}
+
+.row-selected td {
+  background: rgba(217, 119, 6, 0.12) !important;
+}
+
+.row-selected {
+  border-left: 3px solid #d97706;
+}
+
+.planet-id-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.planet-glyph {
+  font-size: 1.1rem;
+  color: #fbbf24;
+  width: 20px;
+  text-align: center;
+}
+
+.planet-name {
+  color: #f8fafc;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.sanskrit-sub {
+  display: block;
+  font-size: 0.68rem;
+  color: #94a3b8;
+}
+
+.badge-flag {
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.flag-retro { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+.flag-combust { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+
+.dms-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 600;
+  color: #f1f5f9;
+  font-size: 0.78rem;
+}
+
+.degree-meter-bg {
+  width: 100%;
+  max-width: 80px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.degree-meter-fill {
+  height: 100%;
+  background: #fbbf24;
+  border-radius: 999px;
+}
+
+.sign-cell-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sign-name-text {
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.element-micro-pill {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.elem-fire { color: #f97316; background: rgba(249, 115, 22, 0.15); }
+.elem-earth { color: #84cc16; background: rgba(132, 204, 22, 0.15); }
+.elem-air { color: #38bdf8; background: rgba(56, 189, 248, 0.15); }
+.elem-water { color: #60a5fa; background: rgba(96, 165, 250, 0.15); }
+
+.house-jump-pill {
+  background: rgba(14, 165, 233, 0.15);
+  border: 1px solid rgba(14, 165, 233, 0.35);
+  color: #38bdf8;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.house-jump-pill:hover {
+  background: rgba(14, 165, 233, 0.3);
+}
+
+.label-k { color: #38bdf8; font-weight: 800; font-size: 0.65rem; }
+.label-t { color: #fbbf24; font-weight: 800; font-size: 0.65rem; }
+
+.lord-pills-row {
+  display: flex;
+  gap: 4px;
+}
+
+.lord-chip {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.lord-chip:hover {
+  background: rgba(56, 189, 248, 0.3);
+}
+
+.dignity-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dign-exalted { background: rgba(251, 191, 36, 0.2); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.4); }
+.dign-own-sign { background: rgba(52, 211, 153, 0.2); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.4); }
+.dign-moolatrikona { background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4); }
+.dign-friend, .dign-great-friend { background: rgba(96, 165, 250, 0.15); color: #60a5fa; }
+.dign-neutral { background: rgba(255, 255, 255, 0.06); color: #cbd5e1; }
+.dign-debilitated { background: rgba(248, 113, 113, 0.2); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.4); }
+
+.nakshatra-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.nak-name {
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.nak-pada {
+  font-size: 0.68rem;
+  color: #94a3b8;
+}
+
+.karaka-badge {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+  font-weight: 800;
+  font-size: 0.72rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.role-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.role-yogakaraka { background: rgba(251, 191, 36, 0.18); color: #fbbf24; }
+.role-lagna-lord { background: rgba(52, 211, 153, 0.18); color: #34d399; }
+.role-functional-benefic { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
+.role-functional-malefic { background: rgba(248, 113, 113, 0.15); color: #f87171; }
+.role-maraka { background: rgba(192, 132, 252, 0.18); color: #c084fc; }
+
+.speed-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.speed-val {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+  color: #cbd5e1;
+}
+
+.motion-tag-retro {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #f59e0b;
+}
+
+.motion-tag-combust {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #ef4444;
+}
+
+.subtle-dim {
+  color: #64748b;
+  font-size: 0.75rem;
+}
+
+/* Houses Table Specifics */
+
+.bhava-id-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bhava-num {
+  font-weight: 800;
+  color: #38bdf8;
+  font-size: 0.85rem;
+}
+
+.bhava-name {
+  color: #f8fafc;
+  font-weight: 700;
+}
+
+.lord-button {
+  background: transparent;
+  border: none;
+  color: #38bdf8;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+}
+
+.lord-button:hover {
+  text-decoration: underline;
+}
+
+.lord-placement-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+}
+
+.dignity-micro-pill {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.occupants-pills-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.occupant-chip {
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #f1f5f9;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+}
+
+.occupant-chip:hover {
+  border-color: #fbbf24;
+}
+
+.aspects-chips-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.aspect-chip {
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 0.68rem;
+  color: #cbd5e1;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.purushartha-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.puru-dharma { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+.puru-artha { background: rgba(52, 211, 153, 0.15); color: #34d399; }
+.puru-kama { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
+.puru-moksha { background: rgba(192, 132, 252, 0.15); color: #c084fc; }
+
+.classification-pills {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.class-pill {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.pill-kendra { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
+.pill-trikona { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+.pill-dusthana { background: rgba(248, 113, 113, 0.15); color: #f87171; }
+.pill-upachaya { background: rgba(52, 211, 153, 0.15); color: #34d399; }
+.pill-maraka { background: rgba(192, 132, 252, 0.15); color: #c084fc; }
+
 

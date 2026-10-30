@@ -3,7 +3,7 @@ import type { AstroChart, DignityType } from '../../types/astro'
 import { VARGA_CATALOG, type VargaInfo } from '../../data/vargaData'
 import { VedicChart } from '../chart/VedicChart'
 import { VargaComparison } from './VargaComparison'
-import { ZODIAC_SIGNS } from '../../types/astro'
+import { ZODIAC_SIGNS, EXALTATION_SIGNS, DEBILITATION_SIGNS, OWN_SIGNS } from '../../types/astro'
 
 interface VargaWorkspaceProps {
   chart: AstroChart
@@ -54,18 +54,13 @@ export const VargaWorkspace: React.FC<VargaWorkspaceProps> = ({
 
   const currentVargaData = chart.vargas[selectedVargaCode] || chart.vargas['D1']
 
-  // Dignity calculations for the selected varga
-  const EXALT: Record<string, number> = { Sun: 0, Moon: 1, Mars: 9, Mercury: 5, Jupiter: 3, Venus: 11, Saturn: 6, Rahu: 1, Ketu: 7 }
-  const DEBIL: Record<string, number> = { Sun: 6, Moon: 7, Mars: 3, Mercury: 11, Jupiter: 9, Venus: 5, Saturn: 0, Rahu: 7, Ketu: 1 }
-  const OWN: Record<string, number[]> = { Sun: [4], Moon: [3], Mars: [0, 7], Mercury: [2, 5], Jupiter: [8, 11], Venus: [1, 6], Saturn: [9, 10], Rahu: [10], Ketu: [7] }
-
   const vargaPlanetsWithDetails = useMemo(() => {
     if (!currentVargaData) return []
     return currentVargaData.grahas.map((g) => {
       let dignity: DignityType = 'Neutral'
-      if (EXALT[g.name] === g.signIndex) dignity = 'Exalted'
-      else if (DEBIL[g.name] === g.signIndex) dignity = 'Debilitated'
-      else if (OWN[g.name]?.includes(g.signIndex)) dignity = 'Own Sign'
+      if (EXALTATION_SIGNS[g.name] === g.signIndex) dignity = 'Exalted'
+      else if (DEBILITATION_SIGNS[g.name] === g.signIndex) dignity = 'Debilitated'
+      else if (OWN_SIGNS[g.name]?.includes(g.signIndex)) dignity = 'Own Sign'
 
       const signInfo = ZODIAC_SIGNS[g.signIndex]
       const dispositor = signInfo ? signInfo.lord : '—'

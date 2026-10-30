@@ -1,11 +1,13 @@
 import React from 'react'
 import type { AstroChart, PlanetPosition } from '../../types/astro'
+import { ZODIAC_SIGNS } from '../../types/astro'
 
 interface PlanetInspectorProps {
   planet: PlanetPosition
   chart: AstroChart
   onSelectHouse?: (houseNumber: number) => void
   onSelectPlanet?: (planetName: string) => void
+  onOpenHelp?: (termId: string) => void
 }
 
 export const PlanetInspector: React.FC<PlanetInspectorProps> = ({
@@ -13,6 +15,7 @@ export const PlanetInspector: React.FC<PlanetInspectorProps> = ({
   chart,
   onSelectHouse,
   onSelectPlanet,
+  onOpenHelp,
 }) => {
   // Collect varga positions for this planet
   const vargaSummary = ['D1', 'D9', 'D10', 'D60'].map((code) => {
@@ -30,6 +33,11 @@ export const PlanetInspector: React.FC<PlanetInspectorProps> = ({
   const dispositorPlanet = chart.planets.find((p) => p.name === planet.dispositor)
   // Nakshatra lord planet lookup
   const nakLordPlanet = chart.planets.find((p) => p.name === planet.nakshatraLord)
+
+  // Zodiac Sign Info & Degree Progress
+  const signInfo = ZODIAC_SIGNS.find((s) => s.name === planet.sign) || ZODIAC_SIGNS[planet.signIndex || 0] || ZODIAC_SIGNS[0]
+  const degInSign = planet.degreeInSign || 0
+  const progressPct = Math.min(100, Math.max(0, (degInSign / 30) * 100))
 
   // Color mapping for functional types
   const functionalBadgeColor =
@@ -63,54 +71,114 @@ export const PlanetInspector: React.FC<PlanetInspectorProps> = ({
         <div className="planet-name-row">
           <span className="planet-symbol">{planet.symbol || planet.short}</span>
           <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h4 style={{ margin: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }}>
+              <h4 style={{ margin: 0, fontSize: '1.05rem', color: '#f8fafc' }}>
                 {planet.name} <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>({planet.sanskritName})</span>
               </h4>
-              {planet.charaKarakaCode && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                {planet.charaKarakaCode && (
+                  <span
+                    className="badge"
+                    style={{
+                      background: 'rgba(217, 119, 6, 0.2)',
+                      color: '#f59e0b',
+                      border: '1px solid rgba(245, 158, 11, 0.4)',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                    }}
+                    title={`Jaimini ${planet.charaKaraka}`}
+                  >
+                    {planet.charaKarakaCode}
+                  </span>
+                )}
                 <span
-                  className="badge"
                   style={{
-                    background: 'rgba(217, 119, 6, 0.2)',
-                    color: '#f59e0b',
-                    border: '1px solid rgba(245, 158, 11, 0.4)',
-                    fontSize: '0.72rem',
+                    background: `${dignityColor}20`,
+                    color: dignityColor,
+                    border: `1px solid ${dignityColor}50`,
+                    fontSize: '0.7rem',
                     fontWeight: 700,
+                    padding: '1px 6px',
+                    borderRadius: 4,
                   }}
-                  title={planet.charaKaraka}
                 >
-                  {planet.charaKarakaCode}
+                  {planet.dignity === 'Exalted' ? '👑' : planet.dignity === 'Own Sign' ? '🏰' : planet.dignity === 'Moolatrikona' ? '⚖️' : planet.dignity === 'Debilitated' ? '⚡' : '•'}{' '}
+                  {planet.dignity}
                 </span>
-              )}
+              </div>
             </div>
-            <small style={{ color: '#cbd5e1' }}>
-              {planet.sign} •{' '}
-              <span
-                onClick={() => onSelectHouse?.(planet.houseNumber)}
-                style={{ cursor: onSelectHouse ? 'pointer' : 'default', color: '#38bdf8', textDecoration: 'underline' }}
-                title={`Click to inspect House ${planet.houseNumber}`}
-              >
-                {planet.houseOrdinal} House
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+              <small style={{ color: '#cbd5e1' }}>
+                {signInfo.symbol} {planet.sign} •{' '}
+                <span
+                  onClick={() => onSelectHouse?.(planet.houseNumber)}
+                  style={{ cursor: onSelectHouse ? 'pointer' : 'default', color: '#38bdf8', textDecoration: 'underline', fontWeight: 600 }}
+                  title={`Click to inspect House ${planet.houseNumber}`}
+                >
+                  {planet.houseOrdinal} House
+                </span>
+              </small>
+              <span className={`element-micro-pill elem-${signInfo.element.toLowerCase()}`}>
+                {signInfo.element}
               </span>
-            </small>
+            </div>
           </div>
         </div>
 
-        <p className="planet-degree" style={{ margin: '10px 0 6px' }}>{planet.dms}</p>
+        {/* Degree & Gauge */}
+        <div style={{ margin: '10px 0 8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <span className="planet-degree" style={{ margin: 0, fontSize: '1.2rem', fontFamily: 'monospace' }}>
+              {planet.dms}
+            </span>
+            <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+              {degInSign.toFixed(2)}° of 30°
+            </span>
+          </div>
+          <div className="degree-meter-bg" style={{ width: '100%', maxWidth: 'none', height: 5, marginTop: 4 }}>
+            <div className="degree-meter-fill" style={{ width: `${progressPct}%`, background: dignityColor }} />
+          </div>
+        </div>
 
         <div className="planet-meta" style={{ gap: 6 }}>
           <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-            <span style={{ color: '#cbd5e1' }}>
-              {planet.nakshatra} (Pada {planet.pada})
+            <span style={{ color: '#cbd5e1', fontSize: '0.78rem' }}>
+              ✨ {planet.nakshatra} (Pada {planet.pada})
             </span>
             {planet.retrograde && (
-              <span className="badge badge-err" style={{ fontSize: '0.7rem' }}>
-                Retrograde [R]
+              <span className="badge badge-err" style={{ fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                [R] Vakri (Retrograde)
+                {onOpenHelp && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onOpenHelp('vakri')
+                    }}
+                    style={{ background: 'none', border: 'none', color: '#38bdf8', cursor: 'pointer', padding: 0, fontSize: '0.75rem', fontWeight: 700 }}
+                    title="Learn about Retrograde Motion"
+                  >
+                    ⓘ
+                  </button>
+                )}
               </span>
             )}
             {planet.combust && (
-              <span className="badge badge-err" style={{ fontSize: '0.7rem' }}>
-                Combust ({planet.sunSeparation?.toFixed(1)}° Sun)
+              <span className="badge badge-err" style={{ fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                🔥 Asta (Combust, {planet.sunSeparation?.toFixed(1)}° Sun)
+                {onOpenHelp && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onOpenHelp('asta')
+                    }}
+                    style={{ background: 'none', border: 'none', color: '#38bdf8', cursor: 'pointer', padding: 0, fontSize: '0.75rem', fontWeight: 700 }}
+                    title="Learn about Combustion"
+                  >
+                    ⓘ
+                  </button>
+                )}
               </span>
             )}
           </div>
