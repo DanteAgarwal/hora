@@ -80,7 +80,14 @@ export const VedicCockpit: React.FC<VedicCockpitProps> = ({
         </div>
 
         <div className="cockpit-main-value">
-          <h2 className="sign-title">{quickFacts.lagna}</h2>
+          <h2
+            className="sign-title"
+            onClick={() => onSelectHouse?.(1)}
+            style={{ cursor: 'pointer' }}
+            title="Inspect 1st House (Lagna Bhava)"
+          >
+            {quickFacts.lagna}
+          </h2>
           <span className="degree-badge">{quickFacts.lagnaDms}</span>
         </div>
 

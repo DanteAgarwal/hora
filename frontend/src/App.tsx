@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import './App.css'
-import type { AstroChart, BirthData } from './types/astro'
+import type { AstroChart, BirthData, DashaPeriod } from './types/astro'
+import type { DashaChainItem } from './components/timing/dashaUtils'
 import { normalizeChartPayload } from './adapters/horaAdapter'
 import { VedicChart } from './components/chart/VedicChart'
 import { UniversalInspector } from './components/inspector/UniversalInspector'
@@ -77,7 +78,9 @@ function App() {
   const [selectedNav, setSelectedNav] = useState<NavKey>('Overview')
   const [selectedPlanet, setSelectedPlanet] = useState<string>('Sun')
   const [selectedHouse, setSelectedHouse] = useState<number>(1)
-  const [inspectorTab, setInspectorTab] = useState<'planet' | 'house'>('planet')
+  const [selectedDashaPeriod, setSelectedDashaPeriod] = useState<DashaPeriod | null>(null)
+  const [dashaHierarchyChain, setDashaHierarchyChain] = useState<DashaChainItem[]>([])
+  const [inspectorTab, setInspectorTab] = useState<'planet' | 'house' | 'dasha'>('planet')
   const [tableTab, setTableTab] = useState<'planets' | 'houses'>('planets')
   const [chart, setChart] = useState<AstroChart | null>(null)
   const [savedCharts, setSavedCharts] = useState<any[]>([])
@@ -264,7 +267,12 @@ function App() {
               key={item}
               type="button"
               className={selectedNav === item ? 'nav-item active' : 'nav-item'}
-              onClick={() => setSelectedNav(item)}
+              onClick={() => {
+                setSelectedNav(item)
+                if (item === 'Timing') {
+                  setInspectorTab('dasha')
+                }
+              }}
             >
               <span>{item}</span>
               <span className="nav-count">
@@ -330,7 +338,10 @@ function App() {
             setInspectorTab('house')
           }}
           onNavigateToAnalysis={() => setSelectedNav('Analysis')}
-          onNavigateToTiming={() => setSelectedNav('Timing')}
+          onNavigateToTiming={() => {
+            setSelectedNav('Timing')
+            setInspectorTab('dasha')
+          }}
         />
 
         {selectedNav === 'Overview' && (
@@ -462,6 +473,15 @@ function App() {
               setSelectedPlanet(pName)
               setInspectorTab('planet')
             }}
+            onSelectHouse={(hNum) => {
+              setSelectedHouse(hNum)
+              setInspectorTab('house')
+            }}
+            onSelectPeriod={(period, chain) => {
+              setSelectedDashaPeriod(period)
+              setDashaHierarchyChain(chain)
+              setInspectorTab('dasha')
+            }}
           />
         )}
 
@@ -504,6 +524,8 @@ function App() {
         chart={chart}
         selectedPlanetName={selectedPlanet}
         selectedHouseNumber={selectedHouse}
+        selectedDashaPeriod={selectedDashaPeriod}
+        dashaHierarchyChain={dashaHierarchyChain}
         activeTab={inspectorTab}
         onChangeTab={setInspectorTab}
         onSelectPlanet={(pName) => {
@@ -513,6 +535,10 @@ function App() {
         onSelectHouse={(hNum) => {
           setSelectedHouse(hNum)
           setInspectorTab('house')
+        }}
+        onSelectPeriod={(period) => {
+          setSelectedDashaPeriod(period)
+          setInspectorTab('dasha')
         }}
         onOpenHelp={setHelpTermId}
       />

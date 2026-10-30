@@ -18,7 +18,7 @@ export const AstrologicalRadar: React.FC<AstrologicalRadarProps> = ({
   onSelectHouse,
   onNavigateToNav,
 }) => {
-  const { planets, houses, panchanga } = chart
+  const { planets, panchanga } = chart
 
   // Categorize planets by house groups
   const kendraHouses = [1, 4, 7, 10]
@@ -67,7 +67,16 @@ export const AstrologicalRadar: React.FC<AstrologicalRadarProps> = ({
                   >
                     <span>{p.symbol}</span>
                     <span>{p.name}</span>
-                    <small>H{p.houseNumber}</small>
+                    <small
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onSelectHouse?.(p.houseNumber)
+                      }}
+                      title={`Inspect House ${p.houseNumber}`}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      H{p.houseNumber}
+                    </small>
                   </button>
                 ))
               ) : (
@@ -98,7 +107,16 @@ export const AstrologicalRadar: React.FC<AstrologicalRadarProps> = ({
                   >
                     <span>{p.symbol}</span>
                     <span>{p.name}</span>
-                    <small>H{p.houseNumber}</small>
+                    <small
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onSelectHouse?.(p.houseNumber)
+                      }}
+                      title={`Inspect House ${p.houseNumber}`}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      H{p.houseNumber}
+                    </small>
                   </button>
                 ))
               ) : (
@@ -129,7 +147,16 @@ export const AstrologicalRadar: React.FC<AstrologicalRadarProps> = ({
                   >
                     <span>{p.symbol}</span>
                     <span>{p.name}</span>
-                    <small>H{p.houseNumber}</small>
+                    <small
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onSelectHouse?.(p.houseNumber)
+                      }}
+                      title={`Inspect House ${p.houseNumber}`}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      H{p.houseNumber}
+                    </small>
                   </button>
                 ))
               ) : (
@@ -160,7 +187,16 @@ export const AstrologicalRadar: React.FC<AstrologicalRadarProps> = ({
                   >
                     <span>{p.symbol}</span>
                     <span>{p.name}</span>
-                    <small>H{p.houseNumber}</small>
+                    <small
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onSelectHouse?.(p.houseNumber)
+                      }}
+                      title={`Inspect House ${p.houseNumber}`}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      H{p.houseNumber}
+                    </small>
                   </button>
                 ))
               ) : (

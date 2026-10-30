@@ -442,8 +442,8 @@ export const TechnicalTables: React.FC<TechnicalTablesProps> = ({
                       {house.aspectsReceived && house.aspectsReceived.length > 0 ? (
                         <div className="aspects-chips-row">
                           {house.aspectsReceived.map((asp, idx) => (
-                            <span key={idx} className="aspect-chip" title={asp}>
-                              {asp.split(' ')[0]}
+                            <span key={idx} className="aspect-chip" title={`${asp.planet} (${asp.type})`}>
+                              {asp.planet}
                             </span>
                           ))}
                         </div>
