@@ -176,7 +176,7 @@ def _condition(raw: dict | None) -> Condition:
 
 
 def _load_file(path: Path) -> tuple[str, dict, list[Entry], str]:
-    doc = yaml.safe_load(path.read_text())
+    doc = yaml.safe_load(path.read_text(encoding='utf-8'))
     subject = doc["subject"]
     #: A composite-key subject names its second key in ``qualifier_field``.
     qualifier_field = doc.get("qualifier_field")
