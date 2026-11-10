@@ -5,6 +5,7 @@
  * Computes and unites all astrological calculations into a complete AstroChart domain object
  */
 
+
 const {
   SIGN_NAMES,
   SIGN_LORDS,
@@ -46,6 +47,7 @@ const {
 
 const {
   normalizeDashaTreeNode,
+  expandDashaSubPeriodsBackend,
   computeActiveDashaChainBackend,
   calculateSambhandhaBackend,
 } = require('./dashaService')
@@ -66,14 +68,18 @@ const {
 /**
  * Normalizes classical planetary yogas from the Hora API
  */
-function normalizePlanetaryYogas(rawYogas) {
+function normalizePlanetaryYogas(rawYogas, lagnaSignIndex = 0) {
   if (!rawYogas) return []
 
   const list = Array.isArray(rawYogas)
     ? rawYogas
     : Array.isArray(rawYogas.yogas)
-    ? rawYogas.yogas
-    : []
+      ? rawYogas.yogas
+      : []
+
+  const killedSet = new Set(
+    Array.isArray(rawYogas?.results_killed_by_kemadruma) ? rawYogas.results_killed_by_kemadruma : []
+  )
 
   return list.map((y) => {
     const rawGroup = (y.group || 'General').toLowerCase()
@@ -83,13 +89,34 @@ function normalizePlanetaryYogas(rawYogas) {
     else if (rawGroup.includes('mahapurusha')) group = 'Mahapurusha'
     else if (rawGroup.includes('chandra') || rawGroup.includes('lunar')) group = 'Chandra'
     else if (rawGroup.includes('ravi') || rawGroup.includes('solar')) group = 'Ravi'
-    else if (rawGroup.includes('nabhasa')) group = 'Nabhasa'
+    else if (rawGroup.includes('naabhasa') || rawGroup.includes('nabhasa')) group = 'Nabhasa'
     else if (rawGroup.includes('vipareeta')) group = 'Vipareeta'
-    else if (rawGroup.includes('general')) group = 'General'
+    else if (rawGroup.includes('popular') || rawGroup.includes('general')) group = 'General'
 
     const participants = Array.isArray(y.participants)
       ? y.participants.map((p) => (typeof p === 'string' ? p : p.graha_name || p.name || ''))
       : []
+
+    // Derive houses involved from participants and lagna if not explicitly provided
+    let housesInvolved = y.houses_involved || y.housesInvolved
+    if ((!housesInvolved || housesInvolved.length === 0) && Array.isArray(y.participants)) {
+      const houseSet = new Set()
+      for (const p of y.participants) {
+        if (p && typeof p.sign === 'number') {
+          houseSet.add(((p.sign - lagnaSignIndex + 12) % 12) + 1)
+        }
+      }
+      if (houseSet.size > 0) {
+        housesInvolved = Array.from(houseSet).sort((a, b) => a - b)
+      }
+    }
+
+    const isKilled = killedSet.has(y.key)
+    const strength = isKilled ? 'Killed by Kemadruma' : y.weakened ? 'Low' : 'High'
+    let effects = y.effects || (Array.isArray(y.qualifiers) && y.qualifiers.length > 0 ? y.qualifiers.join(', ') : undefined)
+    if (isKilled && (!effects || !effects.includes('Kemadruma'))) {
+      effects = effects ? `${effects} (Fruits cancelled by Kemadruma Yoga)` : 'Fruits cancelled by Kemadruma Yoga'
+    }
 
     return {
       key: y.key || (y.name ? y.name.toLowerCase().replace(/\s+/g, '_') : 'yoga'),
@@ -97,11 +124,11 @@ function normalizePlanetaryYogas(rawYogas) {
       sanskritName: y.sanskrit_name || y.sanskritName || y.name,
       group,
       definition: y.definition || y.reason || '',
-      effects: y.effects || (Array.isArray(y.qualifiers) ? y.qualifiers.join(', ') : undefined),
+      effects,
       present: Boolean(y.present),
-      strength: y.weakened ? 'Low' : 'High',
+      strength,
       participants,
-      housesInvolved: y.houses_involved || y.housesInvolved || undefined,
+      housesInvolved: housesInvolved || undefined,
       reason: y.reason || undefined,
     }
   })
@@ -318,7 +345,8 @@ function buildEnrichedChart(
   const purusharthaBalance = computePurusharthaBalance(planets)
 
   // 12. Shodasavarga Divisional Charts & Comparison
-  const vargas = buildShodasavargaCharts(shodasavarga?.charts || shodasavarga, lagnaSignIndex, planets, lagnaDms)
+  const lagnaLon = rasi?.lagna?.longitude != null ? rasi.lagna.longitude : (lagnaSignIndex * 30 + 15)
+  const vargas = buildShodasavargaCharts(shodasavarga?.charts || shodasavarga, lagnaSignIndex, planets, lagnaDms, lagnaLon)
   const vargaComparison = buildVargaComparison(vargas['D1'], vargas['D9'], planets)
 
   // 13. Dashas & Running Chain
@@ -366,7 +394,8 @@ function buildEnrichedChart(
   const ayanamsaDms = rasi?.ayanamsa?.dms || 'Unavailable'
   const calculationSettings = `${ayanamsaName} ayanamsha • ${rasi?.settings?.house_system || 'Whole Sign'} houses`
 
-  const normalizedYogas = normalizePlanetaryYogas(yogas)
+  const allYogasCatalog = normalizePlanetaryYogas(yogas, lagnaSignIndex)
+  const activeYogas = allYogasCatalog.filter((y) => y.present)
 
   return {
     name,
@@ -427,7 +456,8 @@ function buildEnrichedChart(
     argalas: rawArgalas || null,
     functional: rawFunctional || null,
     vakriAnalysis: vakriAnalysis || null,
-    yogas: normalizedYogas,
+    yogas: activeYogas,
+    allYogasCatalog,
     panchanga,
     aspects,
     relationships: relationships || null,

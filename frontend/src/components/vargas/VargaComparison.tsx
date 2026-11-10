@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import type { AstroChart, ChartStyle, PlanetComparisonRow } from '../../types/astro'
 import { VedicChart } from '../chart/VedicChart'
+import { VARGA_CATALOG } from '../../data/vargaData'
 
 interface VargaComparisonProps {
   chart: AstroChart
@@ -17,24 +18,93 @@ export const VargaComparison: React.FC<VargaComparisonProps> = ({
   onSelectPlanet,
   onSelectHouse,
 }) => {
+  const [targetVargaCode, setTargetVargaCode] = useState<string>('D9')
   const [filterMode, setFilterMode] = useState<'all' | 'vargottama' | 'shifts'>('all')
   const [chartStyle, setChartStyle] = useState<ChartStyle>('north')
 
   const d1 = chart.vargas['D1']
-  const d9 = chart.vargas['D9']
+  const targetVarga = chart.vargas[targetVargaCode] || chart.vargas['D9']
+
+  const targetVargaMeta = useMemo(() => {
+    return VARGA_CATALOG.find((v) => v.code === targetVargaCode) || VARGA_CATALOG.find((v) => v.code === 'D9') || VARGA_CATALOG[0]
+  }, [targetVargaCode])
 
   const isLagnaVargottama = useMemo(() => {
-    if (!d1 || !d9) return false
-    return d1.lagnaSignIndex === d9.lagnaSignIndex
-  }, [d1, d9])
+    if (!d1 || !targetVarga) return false
+    return d1.lagnaSignIndex === targetVarga.lagnaSignIndex
+  }, [d1, targetVarga])
 
-  // Varga comparison rows pre-computed by backend engine
+  // Varga comparison rows: if D9 use pre-computed or dynamic; otherwise compute dynamically
   const comparisonRows = useMemo<PlanetComparisonRow[]>(() => {
-    if (chart.vargaComparison && chart.vargaComparison.length > 0) {
+    if (targetVargaCode === 'D9' && chart.vargaComparison && chart.vargaComparison.length > 0) {
       return chart.vargaComparison
     }
-    return []
-  }, [chart.vargaComparison])
+
+    if (!targetVarga || !chart.planets) return []
+
+    return chart.planets.map((p) => {
+      const tPlacement = targetVarga.grahas?.find((g) => g.name === p.name)
+      const tSign = tPlacement ? tPlacement.signName : p.sign
+      const tSignIndex = tPlacement ? tPlacement.signIndex : p.signIndex
+      const tHouse = tPlacement ? tPlacement.houseNumber : p.houseNumber
+      const tDignity = tPlacement?.dignity || 'Neutral'
+      const tDms = tPlacement ? tPlacement.dms : p.dms
+
+      const isVargottama = p.signIndex === tSignIndex
+
+      let dignityShift = 'Consistent'
+      let shiftTone: 'elevated' | 'reduced' | 'stable' | 'neutral' = 'neutral'
+
+      if (p.dignity === 'Debilitated' && (tDignity === 'Exalted' || tDignity === 'Own Sign')) {
+        dignityShift = `Neecha Bhanga (Harmonic Elevation in ${targetVargaCode})`
+        shiftTone = 'elevated'
+      } else if (p.dignity === 'Exalted' && tDignity === 'Debilitated') {
+        dignityShift = `Hollow Exaltation (Lacks enduring stability in ${targetVargaCode})`
+        shiftTone = 'reduced'
+      } else if (p.dignity === 'Exalted' && tDignity === 'Exalted') {
+        dignityShift = `Param Vargottama (Supreme exaltation across both charts)`
+        shiftTone = 'elevated'
+      } else if (isVargottama) {
+        dignityShift = `Same-Sign Alignment in ${targetVargaCode}`
+        shiftTone = 'stable'
+      } else if (tDignity === 'Exalted') {
+        dignityShift = `Harmonic Elevation (Gains high strength in ${targetVargaCode})`
+        shiftTone = 'elevated'
+      } else if (tDignity === 'Debilitated') {
+        dignityShift = `Harmonic Friction (Challenges in ${targetVargaCode} matters)`
+        shiftTone = 'reduced'
+      } else if (tDignity === 'Own Sign') {
+        dignityShift = `Sthira Grounding (Own sign in ${targetVargaCode})`
+        shiftTone = 'stable'
+      }
+
+      return {
+        name: p.name,
+        sanskrit: p.sanskritName || p.name,
+        symbol: p.symbol || '✦',
+        retrograde: Boolean(p.retrograde),
+        combust: Boolean(p.combust),
+        d1Sign: p.sign,
+        d1SignIndex: p.signIndex,
+        d1House: p.houseNumber,
+        d1Dms: p.dms,
+        d1Dignity: p.dignity,
+        targetVargaCode,
+        targetSign: tSign,
+        targetSignIndex: tSignIndex,
+        targetHouse: tHouse,
+        targetDms: tDms,
+        targetDignity: tDignity,
+        d9Sign: tSign,
+        d9SignIndex: tSignIndex,
+        d9House: tHouse,
+        d9Dignity: tDignity,
+        isVargottama,
+        dignityShift,
+        shiftTone,
+      }
+    })
+  }, [targetVargaCode, targetVarga, chart.vargaComparison, chart.planets])
 
   const vargottamaPlanets = useMemo(() => {
     return comparisonRows.filter((r) => r.isVargottama)
@@ -52,16 +122,47 @@ export const VargaComparison: React.FC<VargaComparisonProps> = ({
 
   return (
     <div className="varga-comparison-view" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Overview Banner */}
+      {/* Overview Banner with Target Varga Selector */}
       <div className="panel comparison-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
         <div>
           <p className="eyebrow">Classical Jyotish Comparative Synthesis</p>
-          <h2 style={{ margin: '4px 0', fontSize: '1.25rem', color: '#f8fafc' }}>
-            D1 Rashi (The Tree) vs D9 Navamsha (The Fruit)
-          </h2>
-          <p style={{ margin: 0, fontSize: '0.85rem', color: '#94a3b8', maxWidth: 780 }}>
-            In Parashari astrology, D1 reflects manifest karma, physical vitality, and worldly circumstances.
-            D9 Navamsha reveals the hidden dharmic potential, soul inclination, spouse partnership, and the true enduring strength of the grahas.
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 4 }}>
+            <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#f8fafc' }}>
+              D1 Rashi vs
+            </h2>
+            <select
+              value={targetVargaCode}
+              onChange={(e) => setTargetVargaCode(e.target.value)}
+              style={{
+                background: 'rgba(217, 119, 6, 0.2)',
+                border: '1px solid #f59e0b',
+                color: '#fbbf24',
+                padding: '6px 12px',
+                borderRadius: 6,
+                fontSize: '0.95rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              {VARGA_CATALOG.filter((v) => v.code !== 'D1').map((v) => (
+                <option key={v.code} value={v.code} style={{ background: '#0f172a', color: '#f8fafc' }}>
+                  {v.code} {v.name} ({v.keyFocus})
+                </option>
+              ))}
+            </select>
+          </div>
+          <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#94a3b8', maxWidth: 820 }}>
+            {targetVargaCode === 'D9' ? (
+              <>
+                D1 reflects manifest karma, physical vitality, and worldly circumstances.
+                D9 Navamsha reveals the hidden dharmic potential, soul inclination, spouse partnership, and true enduring strength.
+              </>
+            ) : (
+              <>
+                Comparing baseline D1 Rashi with <strong>{targetVargaMeta.name} ({targetVargaMeta.code})</strong>.
+                Focuses specifically on: <em>{targetVargaMeta.traditionalDomain}</em>
+              </>
+            )}
           </p>
         </div>
 
@@ -114,7 +215,7 @@ export const VargaComparison: React.FC<VargaComparisonProps> = ({
               <span style={{ fontSize: '0.78rem', color: '#94a3b8', marginLeft: 8 }}>Physical Existence & Vitality</span>
             </div>
             <span className="varga-tag" style={{ fontSize: '0.72rem', padding: '2px 8px', background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', borderRadius: 4 }}>
-              Lagna: {d1?.lagnaSignName || chart.quickFacts.lagna}
+              Lagna: {d1?.lagnaSignName} {d1?.lagnaDms ? d1.lagnaDms : ''}
             </span>
           </div>
 
@@ -130,21 +231,21 @@ export const VargaComparison: React.FC<VargaComparisonProps> = ({
           />
         </div>
 
-        {/* Right: D9 Navamsha */}
+        {/* Right: Target Varga */}
         <div className="chart-split-card panel" style={{ padding: 14 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, borderBottom: '1px solid rgba(148, 163, 184, 0.15)', paddingBottom: 8 }}>
             <div>
-              <strong style={{ fontSize: '1rem', color: '#38bdf8' }}>D9 • Navamsha Chakra</strong>
-              <span style={{ fontSize: '0.78rem', color: '#94a3b8', marginLeft: 8 }}>Dharma, Spouse & Inner Strength</span>
+              <strong style={{ fontSize: '1rem', color: '#38bdf8' }}>{targetVargaMeta.code} • {targetVargaMeta.name}</strong>
+              <span style={{ fontSize: '0.78rem', color: '#94a3b8', marginLeft: 8 }}>{targetVargaMeta.keyFocus}</span>
             </div>
             <span className="varga-tag" style={{ fontSize: '0.72rem', padding: '2px 8px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', borderRadius: 4 }}>
-              Lagna: {d9?.lagnaSignName || 'Derived'}
+              Lagna: {targetVarga?.lagnaSignName || 'Derived'} {targetVarga?.lagnaDms ? targetVarga.lagnaDms : ''}
             </span>
           </div>
 
           <VedicChart
             chart={chart}
-            forcedVarga="D9"
+            forcedVarga={targetVargaCode}
             hideVargaSelector
             defaultStyle={chartStyle}
             selectedPlanet={selectedPlanet}
@@ -155,19 +256,28 @@ export const VargaComparison: React.FC<VargaComparisonProps> = ({
         </div>
       </div>
 
-      {/* Vargottama Spotlight Box */}
+      {/* Vargottama / Same-Sign Alignment Spotlight Box */}
       <div className="panel vargottama-spotlight" style={{ borderLeft: '4px solid #f59e0b', background: 'rgba(217, 119, 6, 0.08)', padding: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
           <span style={{ fontSize: '1.3rem' }}>🌟</span>
           <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#fbbf24' }}>
-            Vargottama Grahas ({vargottamaPlanets.length + (isLagnaVargottama ? 1 : 0)} Identified)
+            {targetVargaCode === 'D9' ? 'Vargottama Grahas' : `Harmonic Alignment in ${targetVargaCode}`} ({vargottamaPlanets.length + (isLagnaVargottama ? 1 : 0)} Identified)
           </h3>
         </div>
 
         <p style={{ margin: '0 0 12px 0', fontSize: '0.85rem', color: '#cbd5e1' }}>
-          <strong>Vargottama</strong> occurs when a planet occupies the exact same zodiac sign in both the natal Rashi (D1) and Navamsha (D9).
-          Classically revered as giving the planet the stability, resilience, and unyielding fortitude of an <em>Own Sign</em> placement,
-          ensuring internal convictions match external circumstances.
+          {targetVargaCode === 'D9' ? (
+            <>
+              <strong>Vargottama</strong> occurs when a planet occupies the exact same zodiac sign in both natal Rashi (D1) and Navamsha (D9).
+              Classically revered as giving the planet the stability, resilience, and fortitude of an <em>Own Sign</em> placement,
+              ensuring internal soul convictions match external worldly circumstances.
+            </>
+          ) : (
+            <>
+              Planets that occupy the same zodiac sign in both D1 and {targetVargaMeta.name} ({targetVargaCode}) retain unwavering consistency
+              and direct expression for {targetVargaMeta.keyFocus.toLowerCase()}.
+            </>
+          )}
         </p>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
@@ -185,8 +295,8 @@ export const VargaComparison: React.FC<VargaComparisonProps> = ({
               }}
             >
               <span style={{ fontWeight: 'bold', color: '#fbbf24' }}>Ascendant (Lagna)</span>
-              <span style={{ fontSize: '0.8rem', color: '#e2e8f0' }}>Vargottama in {d1?.lagnaSignName}</span>
-              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>• Superb physical stamina & clear sense of purpose</span>
+              <span style={{ fontSize: '0.8rem', color: '#e2e8f0' }}>Aligned in {d1?.lagnaSignName}</span>
+              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>• Superb physical stamina & unshakeable purpose</span>
             </div>
           )}
 
@@ -205,19 +315,19 @@ export const VargaComparison: React.FC<VargaComparisonProps> = ({
                 borderRadius: 6,
                 cursor: 'pointer',
               }}
-              title="Click to inspect this Vargottama planet"
+              title={`Click to inspect this planet`}
             >
               <span style={{ fontWeight: 'bold', color: '#fbbf24' }}>{vp.name} ({vp.sanskrit})</span>
-              <span style={{ fontSize: '0.8rem', color: '#e2e8f0' }}>Vargottama in {vp.d1Sign}</span>
+              <span style={{ fontSize: '0.8rem', color: '#e2e8f0' }}>In {vp.d1Sign}</span>
               <span style={{ fontSize: '0.72rem', background: '#d97706', color: '#fff', padding: '1px 6px', borderRadius: 4 }}>
-                Own-Sign Quality
+                {targetVargaCode === 'D9' ? 'Vargottama' : 'Aligned Sign'}
               </span>
             </div>
           ))}
 
           {vargottamaPlanets.length === 0 && !isLagnaVargottama && (
             <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>
-              No planets are strictly Vargottama in this chart. Check the table below for dignity shifts (such as planets gaining strength in D9).
+              No planets occupy the identical sign across D1 and {targetVargaCode}. Check the comparative table below for dignity shifts and harmonic gains.
             </div>
           )}
         </div>
@@ -227,7 +337,9 @@ export const VargaComparison: React.FC<VargaComparisonProps> = ({
       <div className="panel comparison-table-panel" style={{ padding: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: '1rem', color: '#f8fafc' }}>Planetary D1 vs D9 Comparative Analysis</h3>
+            <h3 style={{ margin: 0, fontSize: '1rem', color: '#f8fafc' }}>
+              Planetary D1 vs {targetVargaMeta.code} Comparative Analysis
+            </h3>
             <p className="eyebrow" style={{ marginTop: 2 }}>Click any planet to inspect full details in the side panel</p>
           </div>
 
@@ -246,7 +358,7 @@ export const VargaComparison: React.FC<VargaComparisonProps> = ({
               onClick={() => setFilterMode('vargottama')}
               style={{ fontSize: '0.75rem', padding: '4px 10px' }}
             >
-              Vargottama Only ({vargottamaPlanets.length})
+              {targetVargaCode === 'D9' ? 'Vargottama' : 'Aligned'} ({vargottamaPlanets.length})
             </button>
             <button
               type="button"
@@ -266,14 +378,19 @@ export const VargaComparison: React.FC<VargaComparisonProps> = ({
                 <th style={{ padding: '8px 10px' }}>Graha</th>
                 <th style={{ padding: '8px 10px' }}>D1 Rashi (Root)</th>
                 <th style={{ padding: '8px 10px' }}>D1 Dignity</th>
-                <th style={{ padding: '8px 10px' }}>D9 Navamsha (Fruit)</th>
-                <th style={{ padding: '8px 10px' }}>D9 Dignity</th>
-                <th style={{ padding: '8px 10px' }}>Status & Classical Shift</th>
+                <th style={{ padding: '8px 10px' }}>{targetVargaMeta.code} {targetVargaMeta.name}</th>
+                <th style={{ padding: '8px 10px' }}>{targetVargaMeta.code} Dignity</th>
+                <th style={{ padding: '8px 10px' }}>Status & Harmonic Shift</th>
               </tr>
             </thead>
             <tbody>
               {filteredRows.map((row) => {
                 const isSelected = selectedPlanet === row.name
+                const targetSignDisplay = row.targetSign || row.d9Sign
+                const targetHouseDisplay = row.targetHouse || row.d9House
+                const targetDignityDisplay = row.targetDignity || row.d9Dignity
+                const targetDmsDisplay = row.targetDms
+
                 return (
                   <tr
                     key={row.name}
@@ -292,7 +409,7 @@ export const VargaComparison: React.FC<VargaComparisonProps> = ({
                     </td>
                     <td style={{ padding: '10px 10px' }}>
                       <span>{row.d1Sign} (H{row.d1House})</span>
-                      <small style={{ display: 'block', color: '#64748b' }}>{row.d1Dms}</small>
+                      <small style={{ display: 'block', color: '#64748b', fontFamily: 'monospace' }}>{row.d1Dms}</small>
                     </td>
                     <td style={{ padding: '10px 10px' }}>
                       <span
@@ -306,17 +423,20 @@ export const VargaComparison: React.FC<VargaComparisonProps> = ({
                       </span>
                     </td>
                     <td style={{ padding: '10px 10px' }}>
-                      <strong style={{ color: '#38bdf8' }}>{row.d9Sign}</strong> <span>(H{row.d9House})</span>
+                      <strong style={{ color: '#38bdf8' }}>{targetSignDisplay}</strong> <span>(H{targetHouseDisplay})</span>
+                      {targetDmsDisplay && (
+                        <small style={{ display: 'block', color: '#64748b', fontFamily: 'monospace' }}>{targetDmsDisplay}</small>
+                      )}
                     </td>
                     <td style={{ padding: '10px 10px' }}>
                       <span
                         style={{
                           color:
-                            row.d9Dignity === 'Exalted' ? '#10b981' : row.d9Dignity === 'Debilitated' ? '#ef4444' : row.d9Dignity === 'Own Sign' ? '#38bdf8' : '#e2e8f0',
-                          fontWeight: ['Exalted', 'Debilitated', 'Own Sign'].includes(row.d9Dignity) ? 600 : 400,
+                            targetDignityDisplay === 'Exalted' ? '#10b981' : targetDignityDisplay === 'Debilitated' ? '#ef4444' : targetDignityDisplay === 'Own Sign' ? '#38bdf8' : '#e2e8f0',
+                          fontWeight: ['Exalted', 'Debilitated', 'Own Sign'].includes(targetDignityDisplay) ? 600 : 400,
                         }}
                       >
-                        {row.d9Dignity}
+                        {targetDignityDisplay}
                       </span>
                     </td>
                     <td style={{ padding: '10px 10px' }}>
@@ -334,7 +454,7 @@ export const VargaComparison: React.FC<VargaComparisonProps> = ({
                             marginRight: 6,
                           }}
                         >
-                          VARGOTTAMA
+                          {targetVargaCode === 'D9' ? 'VARGOTTAMA' : 'SAME SIGN'}
                         </span>
                       )}
                       <span

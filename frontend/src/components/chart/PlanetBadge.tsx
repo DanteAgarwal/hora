@@ -121,7 +121,19 @@ export const PlanetBadge: React.FC<PlanetBadgeProps> = ({
           fontSize="8.5"
           fontFamily="'JetBrains Mono', monospace"
         >
-          {dms.split("'")[0]}°
+          {(() => {
+            const clean = String(dms).trim()
+            if (clean.includes('°')) {
+              const [deg, min] = clean.split('°')
+              const minClean = (min || '').split("'")[0]
+              return `${deg}°${minClean ? minClean + "'" : ''}`
+            }
+            if (clean.includes('-')) {
+              const parts = clean.split('-')
+              return `${parts[0]}°${parts[1] || '00'}'`
+            }
+            return clean
+          })()}
         </text>
       )}
     </g>

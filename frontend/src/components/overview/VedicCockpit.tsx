@@ -143,7 +143,7 @@ export const VedicCockpit: React.FC<VedicCockpitProps> = ({
           <div className="metric-row">
             <span className="label">Panchanga Tithi</span>
             <span className="tithi-badge">
-              🌔 {panchanga?.tithi?.name || 'Vedic Day'}
+              🌔 {Array.isArray(panchanga?.tithi) ? panchanga.tithi[0]?.name : panchanga?.tithi?.name || 'Vedic Day'}
             </span>
           </div>
         </div>
@@ -227,18 +227,22 @@ export const VedicCockpit: React.FC<VedicCockpitProps> = ({
             <span className="dot" />
             <span>Graha Dignity & Karakas</span>
           </div>
-          {yogas && yogas.length > 0 && (
-            <span
-              className="yogas-pill-action"
-              onClick={(e) => {
-                e.stopPropagation()
-                onNavigateToAnalysis?.()
-              }}
-              title="Click to inspect all classical yogas"
-            >
-              {yogas.length} Yogas Active ⚡
-            </span>
-          )}
+          {(() => {
+            const activeYogasCount = yogas ? yogas.filter((y) => y.present).length : 0
+            if (activeYogasCount === 0) return null
+            return (
+              <span
+                className="yogas-pill-action"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onNavigateToAnalysis?.()
+                }}
+                title={`Click to inspect ${activeYogasCount} active classical yogas (${yogas?.length || 0} evaluated)`}
+              >
+                {activeYogasCount} Yogas Active ⚡
+              </span>
+            )
+          })()}
         </div>
 
         <div className="karaka-pills-row">

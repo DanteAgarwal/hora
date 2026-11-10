@@ -107,6 +107,13 @@ async function computeChart(name, birthData) {
   const lagnaRasiIdx = rasi.lagna?.rasi ?? 0
   refSigns['Lagna'] = lagnaRasiIdx
 
+  const pakshaIdx =
+    panchanga?.paksha?.index !== undefined
+      ? panchanga.paksha.index
+      : typeof panchanga?.paksha === 'number'
+      ? panchanga.paksha
+      : undefined
+
   // Fetch all specialized Vedic calculation modules in parallel
   const [
     aspectsRes,
@@ -129,6 +136,7 @@ async function computeChart(name, birthData) {
       rasis: rasisMap,
       lagna_rasi: lagnaRasiIdx,
       include_nodes: true,
+      ...(pakshaIdx !== undefined ? { paksha: pakshaIdx } : {}),
     }),
     horaFetch('/v1/relationship/chart', {
       rasis: rasisMap,
@@ -279,54 +287,13 @@ app.post('/api/compute', async (req, res) => {
 // Vakri Graha Intelligence Engine Endpoints (PRD Section 22)
 // ---------------------------------------------------------------------------
 
-app.post(['/api/v1/astrology/vakri-analysis', '/api/astrology/vakri-analysis'], async (req, res) => {
+app.all(['/api/v1/*', '/api/astrology/*'], async (req, res) => {
   try {
-    const result = await horaFetch('/v1/astrology/vakri-analysis', req.body)
-    res.json(result)
-  } catch (err) {
-    res.status(err.status || 500).json({ error: err.message })
-  }
-})
-
-app.post(['/api/v1/astrology/vakri-analysis/batch', '/api/astrology/vakri-analysis/batch'], async (req, res) => {
-  try {
-    const result = await horaFetch('/v1/astrology/vakri-analysis/batch', req.body)
-    res.json(result)
-  } catch (err) {
-    res.status(err.status || 500).json({ error: err.message })
-  }
-})
-
-app.get(['/api/v1/astrology/vakri-rules', '/api/astrology/vakri-rules'], async (_req, res) => {
-  try {
-    const result = await horaFetch('/v1/astrology/vakri-rules')
-    res.json(result)
-  } catch (err) {
-    res.status(err.status || 500).json({ error: err.message })
-  }
-})
-
-app.get(['/api/v1/astrology/rules/:ruleId', '/api/astrology/rules/:ruleId'], async (req, res) => {
-  try {
-    const result = await horaFetch(`/v1/astrology/rules/${req.params.ruleId}`)
-    res.json(result)
-  } catch (err) {
-    res.status(err.status || 500).json({ error: err.message })
-  }
-})
-
-app.get(['/api/v1/astrology/sources', '/api/astrology/sources'], async (_req, res) => {
-  try {
-    const result = await horaFetch('/v1/astrology/sources')
-    res.json(result)
-  } catch (err) {
-    res.status(err.status || 500).json({ error: err.message })
-  }
-})
-
-app.get(['/api/v1/astrology/conflicts', '/api/astrology/conflicts'], async (_req, res) => {
-  try {
-    const result = await horaFetch('/v1/astrology/conflicts')
+    const targetPath = req.path.startsWith('/api/v1')
+      ? req.path.replace(/^\/api/, '')
+      : req.path.replace(/^\/api\/astrology/, '/v1/astrology')
+    const query = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''
+    const result = await horaFetch(`${targetPath}${query}`, req.method === 'POST' ? req.body : undefined)
     res.json(result)
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message })
@@ -685,9 +652,10 @@ function enrichLegacyPayload(payload) {
   // Ensure full 16 Shodasavarga charts exist as a dictionary
   const lagnaSignIndex = houses[0]?.signIndex ?? parseSignIndex(payload.lagna || houses[0]?.sign)
   const lagnaDms = payload.lagnaDms || houses[0]?.dms || '0°00\'00"'
+  const lagnaLon = payload.rawRasi?.lagna?.longitude ?? payload.shodasavarga?.D1?.lagna?.longitude ?? (lagnaSignIndex * 30 + 15)
 
-  if (!payload.vargas || Array.isArray(payload.vargas) || !payload.vargas['D1'] || !payload.vargas['D9']?.grahas) {
-    payload.vargas = buildShodasavargaCharts(payload.shodasavargaRaw || null, lagnaSignIndex, planets, lagnaDms)
+  if (!payload.vargas || Array.isArray(payload.vargas) || !payload.vargas['D1'] || !payload.vargas['D9']?.grahas || !payload.vargas['D9']?.lagnaDms) {
+    payload.vargas = buildShodasavargaCharts(payload.shodasavarga || payload.raw?.shodasavarga || payload.shodasavargaRaw || null, lagnaSignIndex, planets, lagnaDms, lagnaLon)
   }
 
   if (!payload.vargaComparison || payload.vargaComparison.length === 0) {
@@ -755,7 +723,10 @@ async function autoUpgradeSavedCharts() {
         !payload.planets ||
         payload.planets[0]?.degreeInSign == null ||
         Array.isArray(payload.vargas) ||
-        !payload.vargas?.['D9']?.grahas
+        !payload.vargas?.['D9']?.grahas ||
+        !payload.vargas?.['D9']?.lagnaDms ||
+        !payload.yogas ||
+        !payload.allYogasCatalog
 
       if (bdata && bdata.year && needsUpgrade) {
         try {

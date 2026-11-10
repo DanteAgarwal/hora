@@ -1,6 +1,7 @@
 /**
  * Shodasavarga Divisional Charts & Comparison Service
  * Kundli Workbench Server Core
+ * Implements all 16 classical Parashari vargas with mathematical parity to BPHS
  */
 
 const {
@@ -15,20 +16,189 @@ const {
 } = require('./astroConstants')
 
 /**
+ * High-precision Parashari calculation of divisional position from sidereal longitude (0° - 360°)
+ */
+function calculateVargaPosition(code, lon) {
+  const normalizedLon = ((lon % 360) + 360) % 360
+  const rasi = Math.floor(normalizedLon / 30) % 12
+  const deg = normalizedLon - rasi * 30
+  const odd = rasi % 2 === 0 // 0-indexed: 0=Aries (odd), 1=Taurus (even), etc.
+  const modality = rasi % 3 // 0=Movable, 1=Fixed, 2=Dual
+  let sign = 0
+  let frac = 0
+
+  switch (code) {
+    case 'D1':
+      sign = rasi
+      frac = deg / 30
+      break
+
+    case 'D2': {
+      // Hora: 2 divisions of 15°
+      const idx = Math.min(1, Math.floor(deg / 15))
+      sign = odd ? (idx === 0 ? 4 : 3) : (idx === 0 ? 3 : 4) // Odd: Sun (Leo) / Moon (Cancer); Even reversed
+      frac = (deg - idx * 15) / 15
+      break
+    }
+
+    case 'D3': {
+      // Drekkana: 3 divisions of 10° (1st, 5th, 9th)
+      const idx = Math.min(2, Math.floor(deg / 10))
+      sign = (rasi + idx * 4) % 12
+      frac = (deg - idx * 10) / 10
+      break
+    }
+
+    case 'D4': {
+      // Chaturthamsha: 4 divisions of 7°30' (1st, 4th, 7th, 10th)
+      const idx = Math.min(3, Math.floor(deg / 7.5))
+      sign = (rasi + idx * 3) % 12
+      frac = (deg - idx * 7.5) / 7.5
+      break
+    }
+
+    case 'D7': {
+      // Saptamsha: 7 divisions of 4°17'08.57" (Odd: self; Even: 7th)
+      const span = 30 / 7
+      const idx = Math.min(6, Math.floor(deg / span))
+      const start = odd ? rasi : (rasi + 6) % 12
+      sign = (start + idx) % 12
+      frac = (deg - idx * span) / span
+      break
+    }
+
+    case 'D9': {
+      // Navamsha: 9 divisions of 3°20' (cyclic rasi * 9 + pada)
+      const span = 30 / 9
+      const idx = Math.min(8, Math.floor(deg / span))
+      sign = (rasi * 9 + idx) % 12
+      frac = (deg - idx * span) / span
+      break
+    }
+
+    case 'D10': {
+      // Dashamsha: 10 divisions of 3° (Odd: self; Even: 9th)
+      const idx = Math.min(9, Math.floor(deg / 3))
+      const start = odd ? rasi : (rasi + 8) % 12
+      sign = (start + idx) % 12
+      frac = (deg - idx * 3) / 3
+      break
+    }
+
+    case 'D12': {
+      // Dvadashamsha: 12 divisions of 2°30' (starts from self)
+      const idx = Math.min(11, Math.floor(deg / 2.5))
+      sign = (rasi + idx) % 12
+      frac = (deg - idx * 2.5) / 2.5
+      break
+    }
+
+    case 'D16': {
+      // Shodashamsha: 16 divisions of 1°52'30" (Movable: Aries, Fixed: Leo, Dual: Sg)
+      const span = 30 / 16
+      const idx = Math.min(15, Math.floor(deg / span))
+      sign = (modality * 4 + idx) % 12
+      frac = (deg - idx * span) / span
+      break
+    }
+
+    case 'D20': {
+      // Vimshamsha: 20 divisions of 1°30' (Movable: Aries, Fixed: Sg, Dual: Leo)
+      const idx = Math.min(19, Math.floor(deg / 1.5))
+      const start = [0, 8, 4][modality]
+      sign = (start + idx) % 12
+      frac = (deg - idx * 1.5) / 1.5
+      break
+    }
+
+    case 'D24': {
+      // Chaturvimshamsha: 24 divisions of 1°15' (Odd: Leo; Even: Cancer)
+      const idx = Math.min(23, Math.floor(deg / 1.25))
+      const start = odd ? 4 : 3
+      sign = (start + idx) % 12
+      frac = (deg - idx * 1.25) / 1.25
+      break
+    }
+
+    case 'D27': {
+      // Saptavimshamsha / Bhamsha: 27 divisions of 1°06'40" (by Element)
+      const span = 30 / 27
+      const idx = Math.min(26, Math.floor(deg / span))
+      const element = rasi % 4 // Fire, Earth, Air, Water
+      sign = (element * 3 + idx) % 12
+      frac = (deg - idx * span) / span
+      break
+    }
+
+    case 'D30': {
+      // Trimshamsha: 5 unequal divisions
+      const table = odd
+        ? [[5, 0], [10, 10], [18, 8], [25, 2], [30, 6]]
+        : [[5, 1], [12, 5], [20, 11], [25, 9], [30, 7]]
+      let lower = 0
+      for (const [upper, s] of table) {
+        if (deg < upper) {
+          sign = s
+          frac = (deg - lower) / (upper - lower)
+          break
+        }
+        lower = upper
+      }
+      break
+    }
+
+    case 'D40': {
+      // Khavedamsha: 40 divisions of 0°45' (Odd: Aries; Even: Libra)
+      const idx = Math.min(39, Math.floor(deg / 0.75))
+      const start = odd ? 0 : 6
+      sign = (start + idx) % 12
+      frac = (deg - idx * 0.75) / 0.75
+      break
+    }
+
+    case 'D45': {
+      // Akshavedamsha: 45 divisions of 0°40' (Movable: Ar, Fixed: Le, Dual: Sg)
+      const span = 30 / 45
+      const idx = Math.min(44, Math.floor(deg / span))
+      sign = (modality * 4 + idx) % 12
+      frac = (deg - idx * span) / span
+      break
+    }
+
+    case 'D60': {
+      // Shashtiamsha: 60 divisions of 0°30' (starts from self)
+      const idx = Math.min(59, Math.floor(deg / 0.5))
+      sign = (rasi + Math.floor(deg * 2.0)) % 12
+      frac = (deg - idx * 0.5) / 0.5
+      break
+    }
+
+    default:
+      sign = rasi
+      frac = deg / 30
+      break
+  }
+
+  const clampedFrac = Math.min(Math.max(frac, 0), 0.999999)
+  const degInSign = clampedFrac * 30
+  const projLon = sign * 30 + degInSign
+
+  return {
+    signIndex: sign % 12,
+    signName: SIGN_NAMES[sign % 12],
+    longitude: projLon,
+    degreeInSign: degInSign,
+    dms: formatDms(degInSign),
+  }
+}
+
+/**
  * Derives D9 Navamsha sign index from sign and degree in sign
- * 9 padas of 3°20' (3.333333°) per sign
  */
 function calculateNavamshaSign(signIndex, degreeInSign) {
   const deg = degreeInSign || 0
-  const pada = Math.min(8, Math.max(0, Math.floor(deg / (30 / 9))))
-  const signType = signIndex % 4 // 0: Fire, 1: Earth, 2: Air, 3: Water
-  let startSign = 0
-  if (signType === 0) startSign = 0 // Aries
-  else if (signType === 1) startSign = 9 // Capricorn
-  else if (signType === 2) startSign = 6 // Libra
-  else if (signType === 3) startSign = 3 // Cancer
-
-  return (startSign + pada) % 12
+  const pos = calculateVargaPosition('D9', signIndex * 30 + deg)
+  return pos.signIndex
 }
 
 const VARGA_METADATA_LIST = [
@@ -51,10 +221,26 @@ const VARGA_METADATA_LIST = [
 ]
 
 /**
- * Builds all 16 classical Parashari varga charts with enriched graha properties
+ * Builds all 16 classical Parashari varga charts with enriched graha properties,
+ * accurate lagna degrees, dignities, dispositors, and Vargottama detection
  */
-function buildShodasavargaCharts(shodasavargaRaw, lagnaSignIndex, planets, lagnaDms = '0°00\'00"') {
+function buildShodasavargaCharts(shodasavargaRaw, lagnaSignIndex, planets, lagnaDms = '0°00\'00"', lagnaLongitude = null) {
   const vargas = {}
+
+  // Determine root natal lagna longitude (0..360)
+  let rootLagnaLon = lagnaLongitude
+  if (rootLagnaLon == null) {
+    const rawD1LagnaLon = shodasavargaRaw?.D1?.lagna?.longitude ?? shodasavargaRaw?.charts?.D1?.lagna?.longitude
+    if (rawD1LagnaLon != null) {
+      rootLagnaLon = rawD1LagnaLon
+    } else {
+      // Parse lagnaDms or default to mid-sign
+      rootLagnaLon = lagnaSignIndex * 30 + 15
+    }
+  }
+
+  const rootLagnaDegInSign = rootLagnaLon % 30
+  const effectiveD1LagnaDms = (lagnaDms && lagnaDms !== '0°00\'00"') ? lagnaDms : formatDms(rootLagnaDegInSign)
 
   // 1. D1 Rashi Chart
   vargas['D1'] = {
@@ -64,13 +250,17 @@ function buildShodasavargaCharts(shodasavargaRaw, lagnaSignIndex, planets, lagna
     purpose: 'Core life, physical body, general vitality, baseline existence',
     lagnaSignIndex,
     lagnaSignName: SIGN_NAMES[lagnaSignIndex],
-    lagnaDms,
+    lagnaLongitude: rootLagnaLon,
+    lagnaDegreeInSign: rootLagnaDegInSign,
+    lagnaDms: effectiveD1LagnaDms,
     grahas: planets.map((p) => {
       const d1SignIdx = p.signIndex
       let dignity = 'Neutral'
       if (EXALTATION_SIGNS[p.name] === d1SignIdx) dignity = 'Exalted'
       else if (DEBILITATION_SIGNS[p.name] === d1SignIdx) dignity = 'Debilitated'
       else if (OWN_SIGNS[p.name]?.includes(d1SignIdx)) dignity = 'Own Sign'
+
+      const degInSign = p.degreeInSign ?? (p.longitude != null ? p.longitude % 30 : 0)
 
       return {
         id: p.id,
@@ -79,9 +269,10 @@ function buildShodasavargaCharts(shodasavargaRaw, lagnaSignIndex, planets, lagna
         signIndex: d1SignIdx,
         signName: p.sign,
         houseNumber: p.houseNumber,
-        retrograde: p.retrograde,
+        retrograde: Boolean(p.retrograde),
         longitude: p.longitude,
-        dms: p.dms,
+        degreeInSign: degInSign,
+        dms: p.dms || formatDms(degInSign),
         dignity,
         dispositor: SIGN_LORDS[p.sign] || '—',
         isVargottama: true,
@@ -94,11 +285,19 @@ function buildShodasavargaCharts(shodasavargaRaw, lagnaSignIndex, planets, lagna
     if (meta.code === 'D1') continue
 
     const rawVarga = shodasavargaRaw ? (shodasavargaRaw.charts?.[meta.code] || shodasavargaRaw[meta.code]) : null
+
     let vLagnaIdx = lagnaSignIndex
+    let vLagnaLon = null
+    let vLagnaDegInSign = 0
+    let vLagnaDms = '0°00\'00"'
     let vGrahas = []
 
-    if (rawVarga) {
+    if (rawVarga && rawVarga.lagna) {
       vLagnaIdx = rawVarga.lagna?.rasi ?? parseSignIndex(rawVarga.lagna?.rasi_name)
+      vLagnaLon = rawVarga.lagna?.longitude != null ? rawVarga.lagna.longitude : null
+      vLagnaDegInSign = vLagnaLon != null ? (vLagnaLon % 30) : 0
+      vLagnaDms = vLagnaLon != null ? formatDms(vLagnaDegInSign) : '0°00\'00"'
+
       vGrahas = (rawVarga.grahas || []).map((vg) => {
         const vSignIdx = vg.rasi ?? parseSignIndex(vg.rasi_name)
         const vHouse = vg.house || (((vSignIdx - vLagnaIdx + 12) % 12) + 1)
@@ -133,53 +332,43 @@ function buildShodasavargaCharts(shodasavargaRaw, lagnaSignIndex, planets, lagna
           isVargottama,
         }
       })
-    } else if (meta.code === 'D9') {
-      // High-precision Navamsha fallback if backend shodasavarga is missing D9
-      const lagnaNavSign = calculateNavamshaSign(lagnaSignIndex, 15) // default mid-sign if no exact lagna deg
-      vLagnaIdx = lagnaNavSign
+    } else {
+      // High-precision mathematical fallback for Lagna and all grahas
+      const lagnaPos = calculateVargaPosition(meta.code, rootLagnaLon)
+      vLagnaIdx = lagnaPos.signIndex
+      vLagnaLon = lagnaPos.longitude
+      vLagnaDegInSign = lagnaPos.degreeInSign
+      vLagnaDms = lagnaPos.dms
+
       vGrahas = planets.map((p) => {
-        const navSignIdx = calculateNavamshaSign(p.signIndex, p.degreeInSign || 0)
-        const vHouse = ((navSignIdx - vLagnaIdx + 12) % 12) + 1
+        const pLon = p.longitude != null ? p.longitude : (p.signIndex * 30 + (p.degreeInSign || 0))
+        const pos = calculateVargaPosition(meta.code, pLon)
+        const vHouse = ((pos.signIndex - vLagnaIdx + 12) % 12) + 1
 
         let dignity = 'Neutral'
-        if (EXALTATION_SIGNS[p.name] === navSignIdx) dignity = 'Exalted'
-        else if (DEBILITATION_SIGNS[p.name] === navSignIdx) dignity = 'Debilitated'
-        else if (OWN_SIGNS[p.name]?.includes(navSignIdx)) dignity = 'Own Sign'
+        if (EXALTATION_SIGNS[p.name] === pos.signIndex) dignity = 'Exalted'
+        else if (DEBILITATION_SIGNS[p.name] === pos.signIndex) dignity = 'Debilitated'
+        else if (OWN_SIGNS[p.name]?.includes(pos.signIndex)) dignity = 'Own Sign'
 
-        const vSignName = SIGN_NAMES[navSignIdx]
-        const isVargottama = p.signIndex === navSignIdx
-        const navDegInSign = ((p.degreeInSign || 0) * 9) % 30
+        const dispositor = SIGN_LORDS[pos.signName] || '—'
+        const isVargottama = p.signIndex === pos.signIndex
 
         return {
           id: p.id,
           name: p.name,
           short: p.short,
-          signIndex: navSignIdx,
-          signName: vSignName,
+          signIndex: pos.signIndex,
+          signName: pos.signName,
           houseNumber: vHouse,
-          retrograde: p.retrograde,
-          longitude: navSignIdx * 30 + navDegInSign,
-          degreeInSign: navDegInSign,
-          dms: formatDms(navDegInSign),
+          retrograde: Boolean(p.retrograde),
+          longitude: pos.longitude,
+          degreeInSign: pos.degreeInSign,
+          dms: pos.dms,
           dignity,
-          dispositor: SIGN_LORDS[vSignName] || '—',
+          dispositor,
           isVargottama,
         }
       })
-    } else {
-      // Default fallback
-      vGrahas = planets.map((p) => ({
-        id: p.id,
-        name: p.name,
-        short: p.short,
-        signIndex: p.signIndex,
-        signName: p.sign,
-        houseNumber: p.houseNumber,
-        retrograde: p.retrograde,
-        dignity: p.dignity || 'Neutral',
-        dispositor: p.dispositor || '—',
-        isVargottama: false,
-      }))
     }
 
     vargas[meta.code] = {
@@ -189,6 +378,9 @@ function buildShodasavargaCharts(shodasavargaRaw, lagnaSignIndex, planets, lagna
       purpose: meta.purpose,
       lagnaSignIndex: vLagnaIdx,
       lagnaSignName: SIGN_NAMES[vLagnaIdx],
+      lagnaLongitude: vLagnaLon,
+      lagnaDegreeInSign: vLagnaDegInSign,
+      lagnaDms: vLagnaDms,
       grahas: vGrahas,
     }
   }
@@ -197,47 +389,52 @@ function buildShodasavargaCharts(shodasavargaRaw, lagnaSignIndex, planets, lagna
 }
 
 /**
- * Pre-computes D1 vs D9 comparative analysis rows for the Varga comparison workspace
+ * Pre-computes comparative analysis rows for D1 vs ANY target Varga chart (defaulting to D9)
  */
-function buildVargaComparison(d1Varga, d9Varga, planets) {
-  if (!d9Varga) return []
+function buildVargaComparison(d1Varga, targetVarga, planets) {
+  if (!targetVarga) return []
+
+  const targetCode = targetVarga.code || 'D9'
 
   return planets.map((p) => {
-    const d9Placement = d9Varga.grahas.find((g) => g.name === p.name)
-    const d9SignIndex = d9Placement ? d9Placement.signIndex : p.signIndex
-    const d9Sign = SIGN_NAMES[d9SignIndex] || 'Unknown'
-    const d9House = d9Placement ? d9Placement.houseNumber : p.houseNumber
+    const targetPlacement = targetVarga.grahas?.find((g) => g.name === p.name)
+    const targetSignIndex = targetPlacement ? targetPlacement.signIndex : p.signIndex
+    const targetSign = SIGN_NAMES[targetSignIndex] || 'Unknown'
+    const targetHouse = targetPlacement ? targetPlacement.houseNumber : p.houseNumber
+    const targetDms = targetPlacement ? targetPlacement.dms : p.dms
 
-    const isVargottama = p.signIndex === d9SignIndex
+    const isVargottama = p.signIndex === targetSignIndex
 
-    let d9Dignity = 'Neutral'
-    if (EXALTATION_SIGNS[p.name] === d9SignIndex) d9Dignity = 'Exalted'
-    else if (DEBILITATION_SIGNS[p.name] === d9SignIndex) d9Dignity = 'Debilitated'
-    else if (OWN_SIGNS[p.name]?.includes(d9SignIndex)) d9Dignity = 'Own Sign'
+    let targetDignity = targetPlacement?.dignity || 'Neutral'
+    if (!targetPlacement) {
+      if (EXALTATION_SIGNS[p.name] === targetSignIndex) targetDignity = 'Exalted'
+      else if (DEBILITATION_SIGNS[p.name] === targetSignIndex) targetDignity = 'Debilitated'
+      else if (OWN_SIGNS[p.name]?.includes(targetSignIndex)) targetDignity = 'Own Sign'
+    }
 
     let dignityShift = 'Consistent'
     let shiftTone = 'neutral'
 
-    if (p.dignity === 'Debilitated' && (d9Dignity === 'Exalted' || d9Dignity === 'Own Sign')) {
-      dignityShift = 'Neecha Bhanga (Dharmic Elevation: Outer struggle transforms into deep inner wisdom)'
+    if (p.dignity === 'Debilitated' && (targetDignity === 'Exalted' || targetDignity === 'Own Sign')) {
+      dignityShift = `Neecha Bhanga (Harmonic Elevation: Outer struggle transforms into inner mastery in ${targetCode})`
       shiftTone = 'elevated'
-    } else if (p.dignity === 'Exalted' && d9Dignity === 'Debilitated') {
-      dignityShift = 'Hollow Exaltation (Promising start but lacks enduring spiritual stability)'
+    } else if (p.dignity === 'Exalted' && targetDignity === 'Debilitated') {
+      dignityShift = `Hollow Exaltation (Promising start but lacks enduring stability in ${targetCode})`
       shiftTone = 'reduced'
-    } else if (p.dignity === 'Exalted' && d9Dignity === 'Exalted') {
-      dignityShift = 'Param Vargottama (Supreme exaltation across body and soul)'
+    } else if (p.dignity === 'Exalted' && targetDignity === 'Exalted') {
+      dignityShift = `Param Vargottama (Supreme exaltation across both charts)`
       shiftTone = 'elevated'
     } else if (isVargottama) {
-      dignityShift = 'Vargottama Root (Inner and outer nature completely aligned)'
+      dignityShift = `Vargottama Root (Inner and outer nature completely aligned)`
       shiftTone = 'stable'
-    } else if (d9Dignity === 'Exalted') {
-      dignityShift = 'Inner Elevation (Gains spiritual strength in Navamsha)'
+    } else if (targetDignity === 'Exalted') {
+      dignityShift = `Harmonic Elevation (Gains potent strength in ${targetCode})`
       shiftTone = 'elevated'
-    } else if (d9Dignity === 'Debilitated') {
-      dignityShift = 'Inner Friction (Challenges in dharmic application)'
+    } else if (targetDignity === 'Debilitated') {
+      dignityShift = `Harmonic Friction (Challenges in manifestation of ${targetCode} themes)`
       shiftTone = 'reduced'
-    } else if (d9Dignity === 'Own Sign') {
-      dignityShift = 'Sthira Grounding (Own sign in Navamsha confers inner confidence)'
+    } else if (targetDignity === 'Own Sign') {
+      dignityShift = `Sthira Grounding (Own sign in ${targetCode} confers inherent confidence)`
       shiftTone = 'stable'
     }
 
@@ -252,10 +449,17 @@ function buildVargaComparison(d1Varga, d9Varga, planets) {
       d1House: p.houseNumber,
       d1Dms: p.dms,
       d1Dignity: p.dignity,
-      d9Sign,
-      d9SignIndex,
-      d9House,
-      d9Dignity,
+      targetVargaCode: targetCode,
+      targetSign,
+      targetSignIndex,
+      targetHouse,
+      targetDms,
+      targetDignity,
+      // D9 compatibility aliases for existing consumers
+      d9Sign: targetSign,
+      d9SignIndex: targetSignIndex,
+      d9House: targetHouse,
+      d9Dignity: targetDignity,
       isVargottama,
       dignityShift,
       shiftTone,
@@ -264,8 +468,9 @@ function buildVargaComparison(d1Varga, d9Varga, planets) {
 }
 
 module.exports = {
+  calculateVargaPosition,
   calculateNavamshaSign,
   buildShodasavargaCharts,
   buildVargaComparison,
+  VARGA_METADATA_LIST,
 }
-

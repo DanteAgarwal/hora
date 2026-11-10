@@ -12,6 +12,7 @@ interface AnalysisWorkspaceProps {
   chart: AstroChart
   onSelectPlanet?: (planetName: string) => void
   onSelectHouse?: (houseNumber: number) => void
+  onNavigateToLearn?: () => void
 }
 
 type AnalysisTab = 'overview' | 'aspects' | 'dignity' | 'vakri' | 'purushartha' | 'yogas' | 'ashtakavarga' | 'longevity'
@@ -20,6 +21,7 @@ export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = ({
   chart,
   onSelectPlanet,
   onSelectHouse,
+  onNavigateToLearn,
 }) => {
   const [activeTab, setActiveTab] = useState<AnalysisTab>('overview')
 
@@ -82,7 +84,7 @@ export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = ({
                 border: '1px solid rgba(212, 171, 92, 0.3)',
               }}
             >
-              {yogasCount} Classical Yogas Detected
+              {yogasCount} Active Classical Yogas in Kundli
             </span>
           </div>
         </div>
@@ -225,7 +227,7 @@ export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = ({
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
               <h3 style={{ margin: 0, fontSize: '1rem', color: '#f8fafc', fontWeight: 700 }}>
-                ✨ Classical Planetary Yogas ({yogasCount})
+                ✨ Active Classical Yogas ({yogasCount})
               </h3>
               <button
                 type="button"
@@ -240,6 +242,7 @@ export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = ({
               chart={chart}
               onSelectPlanet={onSelectPlanet}
               onSelectHouse={onSelectHouse}
+              onNavigateToLearn={onNavigateToLearn}
             />
           </div>
         </div>
@@ -305,8 +308,11 @@ export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = ({
           chart={chart}
           onSelectPlanet={onSelectPlanet}
           onSelectHouse={onSelectHouse}
+          onNavigateToLearn={onNavigateToLearn}
         />
       )}
     </div>
   )
 }
+
+

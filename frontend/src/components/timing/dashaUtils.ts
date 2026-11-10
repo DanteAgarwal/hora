@@ -1,13 +1,5 @@
 import type { AstroChart, DashaPeriod } from '../../types/astro'
 
-/**
- * @deprecated Client-side dasha mathematical expansion has been removed.
- * Subperiods are calculated strictly on the backend engine via fetchExpandedSubPeriods().
- */
-export function expandDashaSubPeriods(parent: DashaPeriod, _targetLevel?: number): DashaPeriod[] {
-  return parent?.children || []
-}
-
 export interface DashaChainItem {
   level: number
   levelLabel: string

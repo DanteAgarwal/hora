@@ -496,6 +496,7 @@ function App() {
             chart={chart}
             onSelectPlanet={handleSelectPlanet}
             onSelectHouse={handleSelectHouse}
+            onNavigateToLearn={() => setSelectedNav('Learn')}
           />
         )}
 
@@ -510,7 +511,11 @@ function App() {
         )}
 
         {selectedNav === 'Learn' && (
-          <LearnWorkspace chart={chart} />
+          <LearnWorkspace
+            chart={chart}
+            onSelectPlanet={handleSelectPlanet}
+            onSelectHouse={handleSelectHouse}
+          />
         )}
       </main>
 

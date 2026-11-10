@@ -9,6 +9,7 @@ interface GlossaryViewerProps {
 
 const CATEGORIES: GlossaryCategory[] = [
   'All',
+  'Yogas',
   'Planets & Dignity',
   'Houses (Bhavas)',
   'Nakshatras & Stars',

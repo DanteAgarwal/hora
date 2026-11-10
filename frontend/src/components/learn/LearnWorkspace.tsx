@@ -2,25 +2,32 @@ import React, { useState } from 'react'
 import type { AstroChart } from '../../types/astro'
 import { ConceptsExplorer } from './ConceptsExplorer'
 import { GlossaryViewer } from './GlossaryViewer'
+import { YogasEncyclopedia } from './YogasEncyclopedia'
 
 interface LearnWorkspaceProps {
   chart: AstroChart
-  initialTab?: 'concepts' | 'glossary'
+  initialTab?: 'concepts' | 'glossary' | 'yogas'
   initialTermId?: string
+  onSelectPlanet?: (planetName: string) => void
+  onSelectHouse?: (houseNumber: number) => void
 }
 
 export const LearnWorkspace: React.FC<LearnWorkspaceProps> = ({
   chart,
   initialTab = 'concepts',
   initialTermId,
+  onSelectPlanet,
+  onSelectHouse,
 }) => {
-  const [activeTab, setActiveTab] = useState<'concepts' | 'glossary'>(initialTab)
+  const [activeTab, setActiveTab] = useState<'concepts' | 'glossary' | 'yogas'>(initialTab)
   const [selectedTermId, setSelectedTermId] = useState<string | undefined>(initialTermId)
 
   const handleSelectConceptTerm = (termId: string) => {
     setSelectedTermId(termId)
     setActiveTab('glossary')
   }
+
+  const catalogCount = chart.allYogasCatalog?.length || 168
 
   return (
     <div className="learn-workspace-root" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -54,10 +61,10 @@ export const LearnWorkspace: React.FC<LearnWorkspaceProps> = ({
           </div>
           <div>
             <h2 style={{ margin: 0, fontSize: '1.1rem', color: '#f8fafc', fontWeight: 800 }}>
-              Learn & Knowledge Suite (PRD §10, §23, §39, §43)
+              Learn & Knowledge Suite
             </h2>
             <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
-              Understand classical Jyotish foundations, Sanskrit terminology, and how they apply directly to your chart
+              Classical Jyotish foundations, Sanskrit terminology, and complete 168-Yoga encyclopedia
             </span>
           </div>
         </div>
@@ -71,6 +78,7 @@ export const LearnWorkspace: React.FC<LearnWorkspaceProps> = ({
             borderRadius: 10,
             border: '1px solid rgba(255, 255, 255, 0.08)',
             gap: 4,
+            flexWrap: 'wrap',
           }}
         >
           <button
@@ -136,6 +144,38 @@ export const LearnWorkspace: React.FC<LearnWorkspaceProps> = ({
               80+ Terms
             </span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('yogas')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: 7,
+              border: 'none',
+              background: activeTab === 'yogas' ? 'rgba(168, 85, 247, 0.2)' : 'transparent',
+              color: activeTab === 'yogas' ? '#c084fc' : '#94a3b8',
+              fontSize: '0.82rem',
+              fontWeight: activeTab === 'yogas' ? 700 : 500,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <span>⚜️ Yogas Encyclopedia</span>
+            <span
+              style={{
+                fontSize: '0.68rem',
+                padding: '1px 5px',
+                borderRadius: 4,
+                background: activeTab === 'yogas' ? 'rgba(168, 85, 247, 0.3)' : 'rgba(255, 255, 255, 0.06)',
+                color: activeTab === 'yogas' ? '#f8fafc' : '#64748b',
+              }}
+            >
+              {catalogCount} Yogas
+            </span>
+          </button>
         </div>
       </div>
 
@@ -151,6 +191,14 @@ export const LearnWorkspace: React.FC<LearnWorkspaceProps> = ({
         <GlossaryViewer
           chart={chart}
           initialTermId={selectedTermId}
+        />
+      )}
+
+      {activeTab === 'yogas' && (
+        <YogasEncyclopedia
+          chart={chart}
+          onSelectPlanet={onSelectPlanet}
+          onSelectHouse={onSelectHouse}
         />
       )}
     </div>

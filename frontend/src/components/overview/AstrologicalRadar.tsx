@@ -241,29 +241,48 @@ export const AstrologicalRadar: React.FC<AstrologicalRadarProps> = ({
       )}
 
       {/* 3. PANCHANGA SUMMARY BANNER */}
-      {panchanga && (
-        <div className="radar-section panchanga-section">
-          <p className="eyebrow">Panchanga Coordinates</p>
-          <div className="panchanga-capsule-grid">
-            <div className="panchanga-capsule">
-              <span className="cap-label">Vara (Day)</span>
-              <strong>{panchanga.vaara || 'Solar Day'}</strong>
-            </div>
-            <div className="panchanga-capsule">
-              <span className="cap-label">Tithi</span>
-              <strong title={panchanga.tithi?.name}>{panchanga.tithi?.name || 'Sukla Paksha'}</strong>
-            </div>
-            <div className="panchanga-capsule">
-              <span className="cap-label">Yoga</span>
-              <strong title={panchanga.yoga?.name}>{panchanga.yoga?.name || 'Siddha'}</strong>
-            </div>
-            <div className="panchanga-capsule">
-              <span className="cap-label">Karana</span>
-              <strong title={panchanga.karana?.name}>{panchanga.karana?.name || 'Bava'}</strong>
+      {panchanga && (() => {
+        const vaaraText =
+          typeof panchanga.vaara === 'object' && panchanga.vaara !== null
+            ? (panchanga.vaara as any).name || (panchanga.vaara as any).lord || 'Solar Day'
+            : (panchanga.vaara || 'Solar Day')
+
+        const tithiText = Array.isArray(panchanga.tithi)
+          ? panchanga.tithi[0]?.name || 'Sukla Paksha'
+          : panchanga.tithi?.name || 'Sukla Paksha'
+
+        const yogaText = Array.isArray(panchanga.yoga)
+          ? panchanga.yoga[0]?.name || 'Siddha'
+          : panchanga.yoga?.name || 'Siddha'
+
+        const karanaText = Array.isArray(panchanga.karana)
+          ? panchanga.karana[0]?.name || 'Bava'
+          : panchanga.karana?.name || 'Bava'
+
+        return (
+          <div className="radar-section panchanga-section">
+            <p className="eyebrow">Panchanga Coordinates</p>
+            <div className="panchanga-capsule-grid">
+              <div className="panchanga-capsule">
+                <span className="cap-label">Vara (Day)</span>
+                <strong>{vaaraText}</strong>
+              </div>
+              <div className="panchanga-capsule">
+                <span className="cap-label">Tithi</span>
+                <strong title={tithiText}>{tithiText}</strong>
+              </div>
+              <div className="panchanga-capsule">
+                <span className="cap-label">Yoga</span>
+                <strong title={yogaText}>{yogaText}</strong>
+              </div>
+              <div className="panchanga-capsule">
+                <span className="cap-label">Karana</span>
+                <strong title={karanaText}>{karanaText}</strong>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* 4. WORKSPACE QUICK-NAV CHIPS */}
       <div className="radar-section quick-nav-section">

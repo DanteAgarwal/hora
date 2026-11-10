@@ -148,6 +148,7 @@ export interface VargaGrahaPlacement {
   houseNumber: number // 1 to 12
   retrograde: boolean
   longitude?: number
+  degreeInSign?: number
   dms?: string
   dignity?: DignityType
   dispositor?: string
@@ -161,6 +162,8 @@ export interface VargaChartData {
   purpose: string
   lagnaSignIndex: number // 0 to 11
   lagnaSignName: string
+  lagnaLongitude?: number
+  lagnaDegreeInSign?: number
   lagnaDms?: string
   grahas: VargaGrahaPlacement[]
 }
@@ -321,6 +324,12 @@ export interface PlanetComparisonRow {
   d1House: number
   d1Dms: string
   d1Dignity: DignityType
+  targetVargaCode?: string
+  targetSign?: string
+  targetSignIndex?: number
+  targetHouse?: number
+  targetDms?: string
+  targetDignity?: DignityType
   d9Sign: string
   d9SignIndex: number
   d9House: number
@@ -358,6 +367,7 @@ export interface AstroChart {
   aspects?: any
   relationships?: any
   yogas?: PlanetaryYoga[]
+  allYogasCatalog?: PlanetaryYoga[]
   vakriAnalysis?: VakriChartAnalysis | null
   raw?: any
 }
