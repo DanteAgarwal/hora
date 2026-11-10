@@ -37,6 +37,14 @@ export const PlanetBadge: React.FC<PlanetBadgeProps> = ({
     badgeColor = '#38bdf8' // Cyan
     borderStroke = 'rgba(56, 189, 248, 0.6)'
     badgeBg = 'rgba(14, 116, 144, 0.4)'
+  } else if (name === 'Hora Lagna' || short === 'HL' || name === 'Ghati Lagna' || short === 'GL' || name === 'Sree Lagna' || short === 'SL' || short === 'IL' || short === 'BB') {
+    badgeColor = '#fbbf24' // Gold for Special Lagnas
+    borderStroke = 'rgba(251, 191, 36, 0.7)'
+    badgeBg = 'rgba(217, 119, 6, 0.25)'
+  } else if (name === 'Gulika' || short === 'Gk' || name === 'Maandi' || short === 'Md' || name === 'Dhuma' || short === 'Dh') {
+    badgeColor = '#f43f5e' // Rose for Upagrahas
+    borderStroke = 'rgba(244, 63, 94, 0.6)'
+    badgeBg = 'rgba(136, 19, 55, 0.3)'
   } else if (dignity === 'Exalted') {
     badgeColor = '#fbbf24' // Gold
     borderStroke = 'rgba(251, 191, 36, 0.7)'

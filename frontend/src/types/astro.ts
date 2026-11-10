@@ -100,6 +100,143 @@ export interface PlanetPosition {
   bavPoints?: number
   bavGrade?: 'favorable' | 'neutral' | 'unfavorable'
   vakri?: VakriPlanetAnalysis | null
+  shadbala?: PlanetShadbala
+}
+
+
+export interface SaptavargaSignBreakdown {
+  signIndex: number
+  signName: string
+  signLord: string
+  virupas: number
+}
+
+export interface SthanaBalaBreakdown {
+  totalVirupas: number
+  totalRupas: number
+  uchchaBala: number
+  saptavargajaBala: number
+  saptavargajaBreakdown?: Record<string, SaptavargaSignBreakdown>
+  ojhayugmaBala: number
+  kendraBala: number
+  drekkanaBala: number
+}
+
+export interface DigBalaBreakdown {
+  virupas: number
+  rupas: number
+  peakHouse: number
+}
+
+export interface KaalaBalaBreakdown {
+  totalVirupas: number
+  totalRupas: number
+  nathonatha: number
+  paksha: number
+  tribhaga: number
+  varshaMasaDinaHora: number
+  ayana: number
+  yuddha: number
+}
+
+export interface ChestaBalaBreakdown {
+  virupas: number
+  rupas: number
+  status: string
+}
+
+export interface GenericBalaBreakdown {
+  virupas: number
+  rupas: number
+}
+
+export interface PlanetShadbala {
+  id?: number
+  name: string
+  sanskritName?: string
+  symbol?: string
+  sign?: string
+  houseNumber?: number
+  houseOrdinal?: string
+  retrograde?: boolean
+  combust?: boolean
+  sthanaBala: SthanaBalaBreakdown
+  digBala: DigBalaBreakdown
+  kaalaBala: KaalaBalaBreakdown
+  chestaBala: ChestaBalaBreakdown
+  naisargikaBala: GenericBalaBreakdown
+  drikBala: GenericBalaBreakdown
+  totalVirupas: number
+  totalRupas: number
+  requiredVirupas: number
+  requiredRupas: number
+  strengthRatio: number
+  percentage: number
+  isStrong: boolean
+  status: 'Exceptionally Strong' | 'Strong' | 'Moderate' | 'Deficient' | string
+  rank?: number
+}
+
+export interface ShadbalaResult {
+  planets: PlanetShadbala[]
+  strongestPlanet: string
+  weakestPlanet: string
+  strongCount: number
+  totalCount: number
+  overallHealthScore: number
+}
+
+
+export interface SpecialLagnaPoint {
+  id?: number
+  name: string
+  sanskritName: string
+  code: string
+  abbreviation?: string
+  longitude: number
+  signIndex: number
+  sign: string
+  degrees_in_rasi?: number
+  degreeInSign: number
+  dms: string
+  houseNumber: number
+  houseOrdinal: string
+  signifies: string
+  nature: string
+  rate?: string
+  occupants?: string[]
+  calculationDetails?: any
+}
+
+export interface UpagrahaPoint {
+  id?: number
+  name: string
+  sanskritName: string
+  code: string
+  longitude: number
+  signIndex: number
+  sign: string
+  degrees_in_rasi?: number
+  degreeInSign: number
+  dms: string
+  houseNumber: number
+  houseOrdinal: string
+  group: string
+  nature: string
+  ruler: string
+  partLord?: string | null
+  risesAt?: string | null
+  description?: string
+  occupants?: string[]
+}
+
+export interface UpagrahasResult {
+  all: UpagrahaPoint[]
+  sunBased: UpagrahaPoint[]
+  timeBased: UpagrahaPoint[]
+  gulika: UpagrahaPoint | null
+  maandi: UpagrahaPoint | null
+  totalCount: number
 }
 
 export interface HousePosition {
@@ -369,6 +506,10 @@ export interface AstroChart {
   yogas?: PlanetaryYoga[]
   allYogasCatalog?: PlanetaryYoga[]
   vakriAnalysis?: VakriChartAnalysis | null
+  shadbala?: ShadbalaResult
+  specialLagnas?: SpecialLagnaPoint[]
+  upagrahas?: UpagrahasResult
+  specialPoints?: any
   raw?: any
 }
 

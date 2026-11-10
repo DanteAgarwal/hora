@@ -304,6 +304,21 @@ export const VedicCockpit: React.FC<VedicCockpitProps> = ({
               🔥 {combustPlanets.length} Asta
             </span>
           )}
+          {chart.shadbala && (
+            <span
+              className="mini-dignity-badge"
+              style={{
+                background: 'rgba(212, 171, 92, 0.15)',
+                color: '#fbbf24',
+                border: '1px solid rgba(212, 171, 92, 0.3)',
+                cursor: 'pointer',
+              }}
+              onClick={() => onSelectPlanet?.(chart.shadbala!.strongestPlanet)}
+              title={`Shadbala Vitality: ${chart.shadbala.overallHealthScore}% • Supreme: ${chart.shadbala.strongestPlanet} (${chart.shadbala.strongCount}/7 Above Requirement)`}
+            >
+              ⚖️ Shadbala: {chart.shadbala.strongestPlanet} #1 ({chart.shadbala.overallHealthScore}%)
+            </span>
+          )}
         </div>
       </article>
     </section>

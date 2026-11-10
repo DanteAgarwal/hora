@@ -182,6 +182,7 @@ export function normalizeChartPayload(computed: any): AstroChart {
       functionalWhy: p.functionalWhy,
       bavPoints: p.bavPoints,
       bavGrade: p.bavGrade,
+      shadbala: p.shadbala || null,
     }
   })
 
@@ -375,6 +376,10 @@ export function normalizeChartPayload(computed: any): AstroChart {
     yogas: normalizePlanetaryYogas(computed.yogas || computed.raw?.yogas, houses[0]?.signIndex || 0).filter((y) => y.present),
     allYogasCatalog: normalizePlanetaryYogas(computed.allYogasCatalog || computed.yogas || computed.raw?.yogas, houses[0]?.signIndex || 0),
     vakriAnalysis: computed.vakriAnalysis || null,
+    shadbala: computed.shadbala || null,
+    specialLagnas: computed.specialLagnas || [],
+    upagrahas: computed.upagrahas || null,
+    specialPoints: computed.specialPoints || null,
     raw: computed.raw || {
       rasi: rawRasi,
       dasha: rawDasha,

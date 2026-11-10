@@ -65,6 +65,10 @@ const {
   normalizeAshtakavarga,
 } = require('./ashtakavargaService')
 
+const {
+  computeShadbala,
+} = require('./shadbalaService')
+
 /**
  * Normalizes classical planetary yogas from the Hora API
  */
@@ -154,7 +158,9 @@ function buildEnrichedChart(
   rawAshtakavarga = null,
   rawArgalas = null,
   rawFunctional = null,
-  vakriAnalysis = null
+  vakriAnalysis = null,
+  rawSpecialLagnas = null,
+  rawUpagrahas = null
 ) {
   const lagnaRasi = rasi?.lagna
   let lagnaSignIndex = 0
@@ -349,6 +355,18 @@ function buildEnrichedChart(
   const vargas = buildShodasavargaCharts(shodasavarga?.charts || shodasavarga, lagnaSignIndex, planets, lagnaDms, lagnaLon)
   const vargaComparison = buildVargaComparison(vargas['D1'], vargas['D9'], planets)
 
+  // 12b. Special Lagnas & Upagrahas
+  const specialPoints = computeAllSpecialPoints(rawSpecialLagnas, rawUpagrahas, lagnaSignIndex, planets, birthData)
+
+  // 12c. Classical Parashari Shadbala (Six-Fold Strength)
+  const shadbala = computeShadbala(planets, vargas, birthData)
+  planets.forEach((p) => {
+    const pShad = shadbala.planets.find((x) => x.name === p.name)
+    if (pShad) {
+      p.shadbala = pShad
+    }
+  })
+
   // 13. Dashas & Running Chain
   const rawPeriods = dasha?.periods || dasha?.dashas || []
   const dashas = rawPeriods.slice(0, 9).map((d, i) => {
@@ -441,6 +459,10 @@ function buildEnrichedChart(
     houses,
     vargas,
     vargaComparison,
+    shadbala,
+    specialLagnas: specialPoints.specialLagnas,
+    upagrahas: specialPoints.upagrahas,
+    specialPoints,
     dashas,
     dashaTree: dashas,
     activeDashaChain,
@@ -476,6 +498,8 @@ function buildEnrichedChart(
       ashtakavarga: rawAshtakavarga,
       argalas: rawArgalas,
       functional: rawFunctional,
+      specialLagnas: rawSpecialLagnas,
+      upagrahas: rawUpagrahas,
     },
     rawRasi: rasi,
     rawPanchanga: panchanga,

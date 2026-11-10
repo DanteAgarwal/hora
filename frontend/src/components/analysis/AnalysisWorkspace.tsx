@@ -7,6 +7,8 @@ import { PlanetaryYogasSummary } from './PlanetaryYogasSummary'
 import { AshtakavargaArudhasView } from './AshtakavargaArudhasView'
 import { LongevityMarakasView } from './LongevityMarakasView'
 import { VakriGrahaIntelligenceView } from './VakriGrahaIntelligenceView'
+import { ShadbalaWorkspace } from './ShadbalaWorkspace'
+import { SpecialLagnasWorkspace } from './SpecialLagnasWorkspace'
 
 interface AnalysisWorkspaceProps {
   chart: AstroChart
@@ -15,7 +17,7 @@ interface AnalysisWorkspaceProps {
   onNavigateToLearn?: () => void
 }
 
-type AnalysisTab = 'overview' | 'aspects' | 'dignity' | 'vakri' | 'purushartha' | 'yogas' | 'ashtakavarga' | 'longevity'
+type AnalysisTab = 'overview' | 'shadbala' | 'specialLagnas' | 'aspects' | 'dignity' | 'vakri' | 'purushartha' | 'yogas' | 'ashtakavarga' | 'longevity'
 
 export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = ({
   chart,
@@ -101,6 +103,8 @@ export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = ({
         >
           {[
             { id: 'overview', label: '📊 Executive Overview', badge: 'Summary' },
+            { id: 'shadbala', label: '⚖️ Shadbala (Six Strengths)', badge: chart.shadbala ? `${chart.shadbala.overallHealthScore}%` : 'BPHS' },
+            { id: 'specialLagnas', label: '🎯 Special Lagnas & Upagrahas', badge: `${chart.specialLagnas?.length || 6} Lagnas` },
             { id: 'aspects', label: '👁️ Aspects Matrix (Drishti)', badge: '9×12 Grid' },
             { id: 'dignity', label: '👑 Planetary Dignity & Strength', badge: 'Ledger' },
             { id: 'vakri', label: '🪐 Vakri Graha Intelligence', badge: `${retroCount} Vakri` },
@@ -296,6 +300,23 @@ export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = ({
       {/* Tab 6: Baadhakas & Marakas */}
       {activeTab === 'longevity' && (
         <LongevityMarakasView
+          chart={chart}
+          onSelectPlanet={onSelectPlanet}
+          onSelectHouse={onSelectHouse}
+        />
+      )}
+
+      {/* Tab: Shadbala (Six Strengths) */}
+      {activeTab === 'shadbala' && (
+        <ShadbalaWorkspace
+          chart={chart}
+          onSelectPlanet={onSelectPlanet}
+        />
+      )}
+
+      {/* Tab: Special Lagnas & Upagrahas */}
+      {activeTab === 'specialLagnas' && (
+        <SpecialLagnasWorkspace
           chart={chart}
           onSelectPlanet={onSelectPlanet}
           onSelectHouse={onSelectHouse}

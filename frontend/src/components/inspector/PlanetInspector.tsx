@@ -185,6 +185,68 @@ export const PlanetInspector: React.FC<PlanetInspectorProps> = ({
         </div>
       </div>
 
+      {/* Parashari Shadbala (Six-Fold Strength) Section */}
+      {planet.shadbala && (
+        <div
+          className="inspector-section"
+          style={{
+            marginTop: 12,
+            background: 'linear-gradient(135deg, rgba(20, 26, 38, 0.9), rgba(15, 19, 28, 0.95))',
+            border: '1px solid rgba(212, 171, 92, 0.3)',
+            borderRadius: 8,
+            padding: '12px 14px',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: 0.8 }}>
+              ⚖️ Parashari Shadbala • Rank #{planet.shadbala.rank}
+            </span>
+            <span
+              style={{
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                padding: '2px 8px',
+                borderRadius: 4,
+                background: planet.shadbala.isStrong ? 'rgba(52, 211, 153, 0.2)' : 'rgba(244, 63, 94, 0.2)',
+                color: planet.shadbala.isStrong ? '#34d399' : '#f43f5e',
+                border: `1px solid ${planet.shadbala.isStrong ? 'rgba(52, 211, 153, 0.4)' : 'rgba(244, 63, 94, 0.4)'}`,
+              }}
+            >
+              {planet.shadbala.totalRupas} / {planet.shadbala.requiredRupas} Rupas ({planet.shadbala.percentage}%)
+            </span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, fontSize: '0.72rem', marginTop: 8 }}>
+            <div style={{ background: 'rgba(0,0,0,0.25)', padding: '6px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.05)' }}>
+              <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.68rem' }}>Sthana (Pos)</span>
+              <span style={{ fontWeight: 700, color: '#f8fafc' }}>{planet.shadbala.sthanaBala.totalVirupas.toFixed(1)}v</span>
+            </div>
+            <div style={{ background: 'rgba(0,0,0,0.25)', padding: '6px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.05)' }}>
+              <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.68rem' }}>Dig (Dir)</span>
+              <span style={{ fontWeight: 700, color: '#f8fafc' }}>{planet.shadbala.digBala.virupas.toFixed(1)}v</span>
+            </div>
+            <div style={{ background: 'rgba(0,0,0,0.25)', padding: '6px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.05)' }}>
+              <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.68rem' }}>Kaala (Temp)</span>
+              <span style={{ fontWeight: 700, color: '#f8fafc' }}>{planet.shadbala.kaalaBala.totalVirupas.toFixed(1)}v</span>
+            </div>
+            <div style={{ background: 'rgba(0,0,0,0.25)', padding: '6px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.05)' }}>
+              <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.68rem' }}>Chesta (Mot)</span>
+              <span style={{ fontWeight: 700, color: '#f8fafc' }}>{planet.shadbala.chestaBala.virupas.toFixed(1)}v</span>
+            </div>
+            <div style={{ background: 'rgba(0,0,0,0.25)', padding: '6px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.05)' }}>
+              <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.68rem' }}>Naisargika</span>
+              <span style={{ fontWeight: 700, color: '#f8fafc' }}>{planet.shadbala.naisargikaBala.virupas.toFixed(1)}v</span>
+            </div>
+            <div style={{ background: 'rgba(0,0,0,0.25)', padding: '6px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.05)' }}>
+              <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.68rem' }}>Drik (Asp)</span>
+              <span style={{ fontWeight: 700, color: planet.shadbala.drikBala.virupas >= 0 ? '#34d399' : '#f43f5e' }}>
+                {planet.shadbala.drikBala.virupas >= 0 ? `+${planet.shadbala.drikBala.virupas.toFixed(1)}` : planet.shadbala.drikBala.virupas.toFixed(1)}v
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Vakri Graha Intelligence Section (Spec v1.0) */}
       {(planet.retrograde || Boolean(planet.vakri)) && (
         <div

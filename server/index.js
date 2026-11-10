@@ -21,6 +21,8 @@ const { parseSignIndex, formatDms } = require('./services/astroConstants')
 const { computeArudhaPadas } = require('./services/arudhasService')
 const { computeBaadhakas, computeMarakas } = require('./services/longevityService')
 const { normalizeAshtakavarga } = require('./services/ashtakavargaService')
+const { computeShadbala } = require('./services/shadbalaService')
+const { computeAllSpecialPoints } = require('./services/specialPointsService')
 
 const app = express()
 const port = process.env.PORT || 4000
@@ -126,6 +128,8 @@ async function computeChart(name, birthData) {
     argalasRes,
     functionalRes,
     vakriRes,
+    specialLagnasRes,
+    upagrahasRes,
   ] = await Promise.allSettled([
     horaFetch('/v1/aspect/chart', {
       rasis: rasisMap,
@@ -189,6 +193,8 @@ async function computeChart(name, birthData) {
         include_house_offsets: Boolean(birthData.include_house_offsets),
       },
     }),
+    horaFetch('/v1/chart/special-lagnas', birthData),
+    horaFetch('/v1/chart/upagrahas', birthData),
   ])
 
   const aspects = aspectsRes.status === 'fulfilled' ? aspectsRes.value : null
@@ -219,7 +225,9 @@ async function computeChart(name, birthData) {
     ashtakavarga,
     argalas,
     functional,
-    vakriAnalysis
+    vakriAnalysis,
+    specialLagnasRes.status === 'fulfilled' ? specialLagnasRes.value : null,
+    upagrahasRes.status === 'fulfilled' ? upagrahasRes.value : null
   )
 }
 
@@ -417,6 +425,39 @@ app.post('/api/dasha/sambhandha', (req, res) => {
 /**
  * Calculate Aspects Matrix (9 Grahas x 12 Bhavas) on the backend
  */
+app.post('/api/analysis/special-lagnas', (req, res) => {
+  try {
+    const { rawSpecialLagnas, lagnaSignIndex, planets, birthData } = req.body
+    const result = computeAllSpecialPoints(rawSpecialLagnas, null, lagnaSignIndex || 0, planets || [], birthData || {})
+    return res.json(result.specialLagnas)
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/api/analysis/upagrahas', (req, res) => {
+  try {
+    const { rawUpagrahas, lagnaSignIndex, planets } = req.body
+    const result = computeAllSpecialPoints(null, rawUpagrahas, lagnaSignIndex || 0, planets || [], {})
+    return res.json(result.upagrahas)
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/api/analysis/shadbala', (req, res) => {
+  try {
+    const { planets, vargas, birthData } = req.body
+    if (!planets || !Array.isArray(planets)) {
+      return res.status(400).json({ error: 'planets array is required' })
+    }
+    const result = computeShadbala(planets, vargas || {}, birthData || {})
+    return res.json(result)
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+})
+
 app.post('/api/analysis/aspects-matrix', (req, res) => {
   try {
     const { planets, houses, lagnaSignIndex } = req.body
@@ -664,6 +705,23 @@ function enrichLegacyPayload(payload) {
     }
   }
 
+  // Ensure Special Lagnas & Upagrahas exist
+  if ((!payload.specialLagnas || !payload.upagrahas) && planets.length > 0) {
+    const sp = computeAllSpecialPoints(payload.raw?.specialLagnas, payload.raw?.upagrahas, lagnaSignIndex, planets, payload.birthData || {})
+    if (!payload.specialLagnas) payload.specialLagnas = sp.specialLagnas
+    if (!payload.upagrahas) payload.upagrahas = sp.upagrahas
+    if (!payload.specialPoints) payload.specialPoints = sp
+  }
+
+  // Ensure Shadbala exists
+  if (!payload.shadbala && planets.length > 0) {
+    payload.shadbala = computeShadbala(planets, payload.vargas || {}, payload.birthData || {})
+    planets.forEach((p) => {
+      const pShad = payload.shadbala.planets.find((x) => x.name === p.name)
+      if (pShad) p.shadbala = pShad
+    })
+  }
+
   // Ensure purusharthaBalance exists
   if (!payload.purusharthaBalance && planets.length > 0) {
     payload.purusharthaBalance = computePurusharthaBalance(planets)
@@ -726,7 +784,7 @@ async function autoUpgradeSavedCharts() {
         !payload.vargas?.['D9']?.grahas ||
         !payload.vargas?.['D9']?.lagnaDms ||
         !payload.yogas ||
-        !payload.allYogasCatalog
+        !payload.allYogasCatalog || !payload.shadbala || !payload.specialLagnas || !payload.upagrahas
 
       if (bdata && bdata.year && needsUpgrade) {
         try {
