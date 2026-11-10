@@ -1,0 +1,145 @@
+/* ==========================================================================
+   VEDIC KUNDLI CHARTS (NORTH & SOUTH INDIAN) & SVG STYLES
+   ========================================================================== */
+
+.vedic-chart-wrapper {
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.8) 0%, rgba(9, 13, 22, 0.95) 100%);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chart-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 1fr);
+  gap: 18px;
+}
+
+@media (max-width: 1280px) {
+  .chart-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chart-board {
+  min-height: 400px;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(212, 171, 92, 0.05), rgba(17, 21, 28, 0.5));
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kundli-svg-container {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.kundli-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+}
+
+/* Planet Badges inside Chart */
+.planet-badge {
+  transition: transform 0.15s ease, filter 0.15s ease;
+  cursor: pointer;
+}
+
+.planet-badge:hover {
+  transform: scale(1.15);
+  filter: drop-shadow(0 0 6px rgba(246, 219, 157, 0.9));
+}
+
+/* Segmented Control for Chart Style (North/South) */
+.segmented-control {
+  display: inline-flex;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 2px;
+}
+
+.segment-btn {
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.segment-btn:hover {
+  color: #f1f5f9;
+}
+
+.segment-btn.active {
+  background: linear-gradient(135deg, var(--gold-dark), var(--gold-primary));
+  color: #0b0e14;
+  font-weight: 700;
+  box-shadow: 0 2px 8px var(--gold-glow);
+}
+
+/* Dual Wheel Chart Overlays (Natal + Transiting Gochara) */
+.dual-wheel-wrapper {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.dual-wheel-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  flex-wrap: wrap;
+}
+
+.legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+}
+
+.legend-dot-natal {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gold-primary);
+  box-shadow: 0 0 6px var(--gold-primary);
+}
+
+.legend-dot-transit {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 0 6px #38bdf8;
+}
+

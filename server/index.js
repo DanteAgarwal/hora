@@ -23,6 +23,7 @@ const { computeBaadhakas, computeMarakas } = require('./services/longevityServic
 const { normalizeAshtakavarga } = require('./services/ashtakavargaService')
 const { computeShadbala } = require('./services/shadbalaService')
 const { computeAllSpecialPoints } = require('./services/specialPointsService')
+const { buildLiveGocharaReport } = require('./services/transitsService')
 
 const app = express()
 const port = process.env.PORT || 4000
@@ -295,7 +296,7 @@ app.post('/api/compute', async (req, res) => {
 // Vakri Graha Intelligence Engine Endpoints (PRD Section 22)
 // ---------------------------------------------------------------------------
 
-app.all(['/api/v1/*', '/api/astrology/*'], async (req, res) => {
+app.all(['/api/v1/*path', '/api/astrology/*path'], async (req, res) => {
   try {
     const targetPath = req.path.startsWith('/api/v1')
       ? req.path.replace(/^\/api/, '')
@@ -629,6 +630,67 @@ app.get('/api/book-charts/:number', async (req, res) => {
     return res.json(result)
   } catch (err) {
     return res.status(err.status || 500).json({ error: err.message })
+  }
+})
+
+/**
+ * Live Gochara (Transits) & Sade Sati Tracker Endpoint
+ * Calculates real-time planetary transits overlaid on natal chart,
+ * evaluates Saturn Sade Sati & Kantaka Shani, and evaluates Transit Ashtakavarga scores.
+ */
+app.post('/api/transits/live', async (req, res) => {
+  try {
+    const { chartId, chart: incomingChart, transitDate, place, tz_name } = req.body
+
+    let natalChart = incomingChart
+    if (!natalChart && chartId) {
+      const row = db.prepare('SELECT payload, birth_data FROM charts WHERE id = ?').get(chartId)
+      if (row) {
+        let payload = {}
+        let birthData = null
+        try { if (row.payload) payload = JSON.parse(row.payload) } catch {}
+        try { if (row.birth_data) birthData = JSON.parse(row.birth_data) } catch {}
+        natalChart = enrichLegacyPayload(payload)
+        if (birthData && !natalChart.birthData) natalChart.birthData = birthData
+      }
+    }
+
+    if (!natalChart) {
+      return res.status(400).json({ error: 'Natal chart data or valid chartId is required' })
+    }
+
+    // Determine target epoch and place
+    const tDate = transitDate ? new Date(transitDate) : new Date()
+    const targetPlace = place || natalChart.birthData?.place || {
+      name: 'New Delhi',
+      latitude: 28.6139,
+      longitude: 77.2090,
+      altitude: 0,
+    }
+    const tzName = tz_name || natalChart.birthData?.tz_name || 'Asia/Kolkata'
+
+    // Fetch live sidereal planetary positions from Hora Swiss Ephemeris engine
+    const transitRasi = await horaFetch('/v1/chart/rasi', {
+      year: tDate.getFullYear(),
+      month: tDate.getMonth() + 1,
+      day: tDate.getDate(),
+      hour: tDate.getHours(),
+      minute: tDate.getMinutes(),
+      second: tDate.getSeconds(),
+      tz_name: tzName,
+      place: {
+        name: targetPlace.name || 'Current Location',
+        latitude: Number(targetPlace.latitude) || 28.6139,
+        longitude: Number(targetPlace.longitude) || 77.2090,
+        altitude: Number(targetPlace.altitude) || 0,
+      },
+    })
+
+    const report = buildLiveGocharaReport(transitRasi, natalChart, tDate, targetPlace)
+    return res.json(report)
+  } catch (err) {
+    console.error('[Transits API Error]', err)
+    return res.status(err.status || 500).json({ error: err.message || 'Failed to compute live transits' })
   }
 })
 

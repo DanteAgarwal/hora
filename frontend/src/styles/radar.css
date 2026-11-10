@@ -1,0 +1,224 @@
+/* ==========================================================================
+   ASTROLOGICAL RADAR & SUMMARY METRICS
+   ========================================================================== */
+
+.astrological-radar-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: rgba(17, 24, 39, 0.75);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  padding: 16px;
+}
+
+.radar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.radar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.info-tag {
+  font-size: 0.68rem;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.radar-pillars-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.pillar-card {
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kendra-pillar { border-left: 3px solid var(--graha-lagna); }
+.trikona-pillar { border-left: 3px solid var(--amber-light); }
+.dusthana-pillar { border-left: 3px solid var(--status-debilitated); }
+.upachaya-pillar { border-left: 3px solid var(--status-own); }
+
+.pillar-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pillar-icon {
+  font-size: 1rem;
+}
+
+.pillar-label {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.pillar-label strong {
+  font-size: 0.75rem;
+  color: #f1f5f9;
+}
+
+.pillar-label small {
+  font-size: 0.65rem;
+  color: #94a3b8;
+}
+
+.count-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  color: #e2e8f0;
+}
+
+.planet-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.radar-planet-btn {
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  padding: 2px 6px;
+  color: #f1f5f9;
+  font-size: 0.72rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.radar-planet-btn:hover {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: #f59e0b;
+}
+
+.radar-planet-btn small {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.empty-indicator {
+  font-size: 0.7rem;
+  color: #64748b;
+  font-style: italic;
+}
+
+.alerts-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.state-alert-card {
+  flex: 1;
+  min-width: 120px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.retro-alert {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.combust-alert {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.state-alert-card .alert-badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+
+.retro-alert .alert-badge { color: #f59e0b; }
+.combust-alert .alert-badge { color: #ef4444; }
+
+.state-alert-card strong {
+  font-size: 0.8rem;
+  color: #f8fafc;
+}
+
+.state-alert-card small {
+  font-size: 0.68rem;
+  color: #94a3b8;
+}
+
+.panchanga-capsule-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.panchanga-capsule {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 4px 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+.cap-label {
+  font-size: 0.65rem;
+  color: #94a3b8;
+}
+
+.panchanga-capsule strong {
+  font-size: 0.76rem;
+  color: #e2e8f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.quick-nav-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.quick-nav-btn {
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid var(--border-default);
+  color: #e2e8f0;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.quick-nav-btn:hover,
+.quick-nav-btn.active {
+  background: rgba(217, 119, 6, 0.2);
+  border-color: #d97706;
+}
+

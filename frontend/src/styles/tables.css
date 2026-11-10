@@ -1,0 +1,464 @@
+/* ==========================================================================
+   TECHNICAL TABLES (PLANETS & HOUSES), DATA GRIDS & DIGNITY BADGES
+   ========================================================================== */
+
+.technical-tables-container {
+  padding: 18px 20px;
+  border-radius: var(--radius-xl);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.table-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.table-heading-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.table-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.table-title-row h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #f8fafc;
+}
+
+.table-count-badge {
+  font-size: 0.72rem;
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+}
+
+.table-subtitle {
+  margin: 0;
+  font-size: 0.76rem;
+  color: #94a3b8;
+}
+
+.planet-filter-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-bottom: 4px;
+}
+
+.filter-label {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  font-weight: 600;
+  margin-right: 2px;
+}
+
+.filter-chip {
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid var(--border-default);
+  color: #cbd5e1;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.filter-chip:hover {
+  background: rgba(30, 41, 59, 0.9);
+  color: #fff;
+}
+
+.filter-chip.active {
+  background: rgba(217, 119, 6, 0.25);
+  border-color: #d97706;
+  color: #fbbf24;
+}
+
+.table-scroll-wrap {
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+}
+
+.astro-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+.astro-data-table th {
+  background: rgba(15, 23, 42, 0.95);
+  color: #94a3b8;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-prominent);
+  white-space: nowrap;
+}
+
+.astro-data-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+}
+
+.table-row {
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.table-row:hover td {
+  background: rgba(148, 163, 184, 0.05);
+}
+
+.row-selected td {
+  background: rgba(217, 119, 6, 0.12) !important;
+}
+
+.row-selected {
+  border-left: 3px solid #d97706;
+}
+
+.planet-id-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.planet-glyph {
+  font-size: 1.1rem;
+  color: #fbbf24;
+  width: 20px;
+  text-align: center;
+}
+
+.planet-name {
+  color: #f8fafc;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.sanskrit-sub {
+  display: block;
+  font-size: 0.68rem;
+  color: #94a3b8;
+}
+
+.badge-flag {
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.flag-retro { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+.flag-combust { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+
+.dms-text {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: #f1f5f9;
+  font-size: 0.78rem;
+}
+
+.degree-meter-bg {
+  width: 100%;
+  max-width: 80px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-full);
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.degree-meter-fill {
+  height: 100%;
+  background: #fbbf24;
+  border-radius: var(--radius-full);
+}
+
+.sign-cell-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sign-name-text {
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.element-micro-pill {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.elem-fire { color: #f97316; background: rgba(249, 115, 22, 0.15); }
+.elem-earth { color: #84cc16; background: rgba(132, 204, 22, 0.15); }
+.elem-air { color: #38bdf8; background: rgba(56, 189, 248, 0.15); }
+.elem-water { color: #60a5fa; background: rgba(96, 165, 250, 0.15); }
+
+.house-jump-pill {
+  background: rgba(14, 165, 233, 0.15);
+  border: 1px solid rgba(14, 165, 233, 0.35);
+  color: #38bdf8;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all var(--transition-fast);
+}
+
+.house-jump-pill:hover {
+  background: rgba(14, 165, 233, 0.3);
+}
+
+.label-k { color: #38bdf8; font-weight: 800; font-size: 0.65rem; }
+.label-t { color: #fbbf24; font-weight: 800; font-size: 0.65rem; }
+
+.lord-pills-row {
+  display: flex;
+  gap: 4px;
+}
+
+.lord-chip {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.lord-chip:hover {
+  background: rgba(56, 189, 248, 0.3);
+}
+
+.dignity-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dign-exalted { background: rgba(251, 191, 36, 0.2); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.4); }
+.dign-own-sign { background: rgba(52, 211, 153, 0.2); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.4); }
+.dign-moolatrikona { background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4); }
+.dign-friend, .dign-great-friend { background: rgba(96, 165, 250, 0.15); color: #60a5fa; }
+.dign-neutral { background: rgba(255, 255, 255, 0.06); color: #cbd5e1; }
+.dign-debilitated { background: rgba(248, 113, 113, 0.2); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.4); }
+
+.nakshatra-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.nak-name {
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.nak-pada {
+  font-size: 0.68rem;
+  color: #94a3b8;
+}
+
+.karaka-badge {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+  font-weight: 800;
+  font-size: 0.72rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.role-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.role-yogakaraka { background: rgba(251, 191, 36, 0.18); color: #fbbf24; }
+.role-lagna-lord { background: rgba(52, 211, 153, 0.18); color: #34d399; }
+.role-functional-benefic { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
+.role-functional-malefic { background: rgba(248, 113, 113, 0.15); color: #f87171; }
+.role-maraka { background: rgba(192, 132, 252, 0.18); color: #c084fc; }
+
+.speed-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.speed-val {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: #cbd5e1;
+}
+
+.motion-tag-retro {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #f59e0b;
+}
+
+.motion-tag-combust {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #ef4444;
+}
+
+.subtle-dim {
+  color: #64748b;
+  font-size: 0.75rem;
+}
+
+/* Houses Table Specifics */
+.bhava-id-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bhava-num {
+  font-weight: 800;
+  color: #38bdf8;
+  font-size: 0.85rem;
+}
+
+.bhava-name {
+  color: #f8fafc;
+  font-weight: 700;
+}
+
+.lord-button {
+  background: transparent;
+  border: none;
+  color: #38bdf8;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+}
+
+.lord-button:hover {
+  text-decoration: underline;
+}
+
+.lord-placement-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+}
+
+.dignity-micro-pill {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.occupants-pills-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.occupant-chip {
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid var(--border-default);
+  color: #f1f5f9;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.occupant-chip:hover {
+  border-color: #fbbf24;
+}
+
+.aspects-chips-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.aspect-chip {
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 0.68rem;
+  color: #cbd5e1;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.purushartha-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.puru-dharma { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+.puru-artha { background: rgba(52, 211, 153, 0.15); color: #34d399; }
+.puru-kama { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
+.puru-moksha { background: rgba(192, 132, 252, 0.15); color: #c084fc; }
+
+.classification-pills {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.class-pill {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.cell-sign {
+  color: #d0b27c;
+  font-size: 0.72rem;
+  letter-spacing: 0.06rem;
+  text-transform: uppercase;
+}

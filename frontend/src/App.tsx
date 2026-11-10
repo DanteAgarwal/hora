@@ -7,6 +7,7 @@ import { VedicChart } from './components/chart/VedicChart'
 import { UniversalInspector } from './components/inspector/UniversalInspector'
 import { VargaWorkspace } from './components/vargas/VargaWorkspace'
 import { DashaTimeline } from './components/timing/DashaTimeline'
+import { TransitWorkspace } from './components/transits/TransitWorkspace'
 import { AnalysisWorkspace } from './components/analysis/AnalysisWorkspace'
 import { ResearchWorkspace } from './components/research/ResearchWorkspace'
 import { LearnWorkspace } from './components/learn/LearnWorkspace'
@@ -21,9 +22,9 @@ import type { CalculationSettingsConfig } from './components/research/Configurat
 // Types & Constants
 // ---------------------------------------------------------------------------
 
-type NavKey = 'Overview' | 'Charts' | 'Timing' | 'Analysis' | 'Research' | 'Learn'
+type NavKey = 'Overview' | 'Charts' | 'Timing' | 'Transits' | 'Analysis' | 'Research' | 'Learn'
 
-const navItems: NavKey[] = ['Overview', 'Charts', 'Timing', 'Analysis', 'Research', 'Learn']
+const navItems: NavKey[] = ['Overview', 'Charts', 'Timing', 'Transits', 'Analysis', 'Research', 'Learn']
 
 const DEFAULT_BIRTH: BirthData = {
   name: 'Sample Natal (Agra)',
@@ -292,7 +293,7 @@ function App() {
             >
               <span>{item}</span>
               <span className="nav-count">
-                {item === 'Overview' ? '01' : item === 'Charts' ? String(savedCharts.length).padStart(2, '0') : item === 'Analysis' ? '04' : item === 'Research' ? '03' : item === 'Learn' ? '02' : '—'}
+                {item === 'Overview' ? '01' : item === 'Charts' ? String(savedCharts.length).padStart(2, '0') : item === 'Timing' ? '03' : item === 'Transits' ? '🪐' : item === 'Analysis' ? '04' : item === 'Research' ? '05' : item === 'Learn' ? '02' : '—'}
               </span>
             </button>
           ))}
@@ -358,6 +359,7 @@ function App() {
             setSelectedNav('Timing')
             setInspectorTab('dasha')
           }}
+          onNavigateToTransits={() => setSelectedNav('Transits')}
         />
 
         {selectedNav === 'Overview' && (
@@ -488,6 +490,16 @@ function App() {
             onSelectPlanet={handleSelectPlanet}
             onSelectHouse={handleSelectHouse}
             onSelectPeriod={handleSelectPeriod}
+          />
+        )}
+
+        {selectedNav === 'Transits' && (
+          <TransitWorkspace
+            chart={chart}
+            selectedPlanet={selectedPlanet}
+            selectedHouse={selectedHouse}
+            onSelectPlanet={handleSelectPlanet}
+            onSelectHouse={handleSelectHouse}
           />
         )}
 

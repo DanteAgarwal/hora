@@ -784,3 +784,140 @@ export interface VakriChartAnalysis {
   planets: Record<string, VakriPlanetAnalysis>
   chart_level_synthesis: string
 }
+
+
+// ---------------------------------------------------------------------------
+// Live Gochara (Transits) & Sade Sati Domain Models
+// ---------------------------------------------------------------------------
+
+export interface TransitAshtakavargaEvaluation {
+  bavRekhas: number
+  bavVerdict: 'good' | 'neutral' | 'bad'
+  bavEmphasis: string | null
+  savRekhas: number
+  savDominant: boolean
+  savVerdict: 'favorable' | 'unfavorable' | null
+  decidedBy: 'SAV' | 'BAV'
+  finalVerdict: 'good' | 'bad' | 'neutral' | 'favorable' | 'unfavorable'
+  transitScore: number
+}
+
+export interface TransitPlanet {
+  id: number
+  name: string
+  longitude: number
+  latitude: number
+  speed: number
+  retrograde: boolean
+  signIndex: number
+  signName: string
+  degreesInSign: number
+  dms: string
+  nakshatra: number
+  nakshatraName: string
+  pada: number
+  dignity: string
+  combust: boolean
+  houseFromNatalLagna: number
+  houseFromNatalMoon: number
+  gocharaSnapshot: 'Good' | 'Bad' | 'Neutral'
+  gocharaEffect: string
+  isClassicalGood: boolean
+  ashtakavarga: TransitAshtakavargaEvaluation
+  natalConjunct: string[]
+}
+
+export interface SadeSatiReport {
+  isActive: boolean
+  phase: 'rising' | 'peak' | 'setting' | 'none'
+  phaseNumber: number
+  phaseName: string
+  sanskritName: string
+  intensity: string
+  description: string
+  saturnSign: string
+  saturnSignIndex: number
+  natalMoonSign: string
+  natalMoonSignIndex: number
+  degreeOrb: number
+  isExactOrb: boolean
+  advice: string[]
+  remedies: string[]
+}
+
+export interface ShaniAffliction {
+  isActive: boolean
+  houseFromMoon?: number
+  houseFromLagna?: number
+  saturnSign?: string
+  activeFrom?: string
+  description: string
+}
+
+export interface GuruGocharaReport {
+  houseFromMoon: number
+  isFavorable: boolean
+  status: string
+  description: string
+}
+
+export interface DualWheelPlanet {
+  name: string
+  dms: string
+  retrograde?: boolean
+  speed?: number
+  verdict?: string
+}
+
+export interface DualWheelHouse {
+  houseNumber: number
+  signIndex: number
+  signName: string
+  houseFromMoon: number
+  savRekhas: number
+  natalPlanets: DualWheelPlanet[]
+  transitPlanets: DualWheelPlanet[]
+}
+
+export interface LiveGocharaResult {
+  transitEpoch: {
+    timestamp: string
+    place: BirthPlace
+    transitLagna: {
+      signIndex: number
+      signName: string
+      degreesInSign: number
+      dms: string
+      houseFromNatalLagna: number
+    } | null
+  }
+  natalReference: {
+    chartName: string
+    natalLagna: {
+      signIndex: number
+      signName: string
+    }
+    natalMoon: {
+      signIndex: number
+      signName: string
+      longitude: number
+      dms: string
+    }
+  }
+  transitingPlanets: TransitPlanet[]
+  sadeSati: SadeSatiReport
+  ashtamaShani: ShaniAffliction
+  ardhashtamaShani: ShaniAffliction
+  kantakaShani: ShaniAffliction
+  guruGochara: GuruGocharaReport
+  dualWheelHouses: DualWheelHouse[]
+  summary: {
+    averageTransitScore: number
+    favorableCount: number
+    unfavorableCount: number
+    neutralCount: number
+    isSadeSatiActive: boolean
+    isAshtamaShaniActive: boolean
+    isGuruFavorable: boolean
+  }
+}
