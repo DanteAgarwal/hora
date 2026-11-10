@@ -6,7 +6,9 @@ import {
   isSamePeriod,
   getPeriodKey,
   getMahadashaProfile,
+  parseDateMs,
 } from './dashaUtils'
+import { useNow } from '../../hooks/useNow'
 import { fetchExpandedSubPeriods } from '../../services/dashaApi'
 
 interface SambhandhaMatrixProps {
@@ -40,6 +42,8 @@ export const SambhandhaMatrix: React.FC<SambhandhaMatrixProps> = ({
   onSelectHouse,
   onDrillIntoTimeline,
 }) => {
+  const nowMs = useNow(30000)
+
   // Allow user to select and browse any Mahadasha in the matrix
   const [viewedMdLord, setViewedMdLord] = useState<string | null>(null)
   const [adList, setAdList] = useState<DashaPeriod[]>([])
@@ -52,7 +56,7 @@ export const SambhandhaMatrix: React.FC<SambhandhaMatrixProps> = ({
   const currentMd: DashaPeriod | null = useMemo(() => {
     if (viewedMdLord) {
       const found = dashaTree.find(
-        (md) => md.lord.toLowerCase() === viewedMdLord.toLowerCase()
+        (md) => (md.lord || '').toLowerCase() === viewedMdLord.toLowerCase()
       )
       if (found) return found
     }
@@ -117,17 +121,16 @@ export const SambhandhaMatrix: React.FC<SambhandhaMatrixProps> = ({
   // Compute Sambhandha for each Antardasha with the current Mahadasha lord
   const rows = useMemo(() => {
     if (!currentMd) return []
-    const nowMs = Date.now()
 
     return adList.map((ad) => {
-      const startMs = new Date(ad.start).getTime()
-      const endMs = new Date(ad.end).getTime()
+      const startMs = parseDateMs(ad.start)
+      const endMs = parseDateMs(ad.end)
       const isRunning = !isNaN(startMs) && !isNaN(endMs) && startMs <= nowMs && nowMs <= endMs
       const isSelected = isSamePeriod(selectedAd, ad)
 
       const sambhandha = calculateSambhandha(currentMd.lord, ad.lord, chart)
       const planet = chart.planets.find(
-        (p) => p.name.toLowerCase() === ad.lord.toLowerCase()
+        (p) => (p.name || '').toLowerCase() === (ad.lord || '').toLowerCase()
       )
 
       let durationMos = '—'
@@ -144,7 +147,7 @@ export const SambhandhaMatrix: React.FC<SambhandhaMatrixProps> = ({
         durationMos,
       }
     })
-  }, [currentMd, adList, selectedAd, chart])
+  }, [currentMd, adList, selectedAd, chart, nowMs])
 
   // Summary counts across all 9 Antardashas for quick structural overview
   const summaryCounts = useMemo(() => {
@@ -190,7 +193,6 @@ export const SambhandhaMatrix: React.FC<SambhandhaMatrixProps> = ({
 
   const mdProfile = getMahadashaProfile(currentMd.lord)
   const currentLordColor = PLANET_COLORS[currentMd.lord] || '#d97706'
-  const nowMs = Date.now()
 
   return (
     <div
@@ -277,10 +279,10 @@ export const SambhandhaMatrix: React.FC<SambhandhaMatrixProps> = ({
           }}
         >
           {(dashaTree.length > 0 ? dashaTree : DEFAULT_VIMSHOTTARI_CYCLE.map((c) => ({ lord: c.name, level: 1, start: '', end: '', children: [] }))).map((md) => {
-            const isCurrent = md.lord.toLowerCase() === currentMd.lord.toLowerCase()
+            const isCurrent = (md.lord || '').toLowerCase() === (currentMd.lord || '').toLowerCase()
             const lordColor = PLANET_COLORS[md.lord] || '#d97706'
-            const sMs = md.start ? new Date(md.start).getTime() : NaN
-            const eMs = md.end ? new Date(md.end).getTime() : NaN
+            const sMs = md.start ? parseDateMs(md.start) : NaN
+            const eMs = md.end ? parseDateMs(md.end) : NaN
             const isMdRunning = !isNaN(sMs) && !isNaN(eMs) && sMs <= nowMs && nowMs <= eMs
 
             return (

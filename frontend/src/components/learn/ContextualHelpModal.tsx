@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React from 'react'
 import type { AstroChart } from '../../types/astro'
 import { GLOSSARY_TERMS, type GlossaryTerm } from './glossaryData'
 
@@ -15,11 +15,7 @@ export const ContextualHelpModal: React.FC<ContextualHelpModalProps> = ({
   onClose,
   onNavigateToGlossary,
 }) => {
-  const [currentId, setCurrentId] = useState<string>(termId || 'lagna')
-
-  useEffect(() => {
-    if (termId) setCurrentId(termId)
-  }, [termId])
+  const currentId = termId || 'lagna'
 
   const term: GlossaryTerm =
     GLOSSARY_TERMS.find((t) => t.id === currentId || t.name.toLowerCase().includes(currentId.toLowerCase())) ||

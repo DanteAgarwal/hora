@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import type { AstroChart, PlanetPosition } from '../../types/astro'
+import type { AstroChart, PurusharthaGroup, StanzaGroup } from '../../types/astro'
 
 interface BhavaPurusharthaBalanceProps {
   chart: AstroChart
@@ -7,39 +7,18 @@ interface BhavaPurusharthaBalanceProps {
   onSelectHouse?: (houseNumber: number) => void
 }
 
-interface PurusharthaGroup {
-  name: 'Dharma' | 'Artha' | 'Kama' | 'Moksha'
-  sanskrit: string
-  houses: number[]
-  theme: string
-  color: string
-  bgGradient: string
-  planets: PlanetPosition[]
-  percentage: number
-}
-
-interface StanzaGroup {
-  name: string
-  sanskrit: string
-  houses: number[]
-  description: string
-  planets: PlanetPosition[]
-  count: number
-}
-
 export const BhavaPurusharthaBalance: React.FC<BhavaPurusharthaBalanceProps> = ({
   chart,
   onSelectPlanet,
   onSelectHouse,
 }) => {
-  const validPlanets = useMemo(() => {
-    return chart.planets.filter((p) => !['Lagna'].includes(p.name))
-  }, [chart.planets])
-
-  const totalPlanets = validPlanets.length || 9
-
-  // 1. Purushartha Distribution (Dharma 1,5,9; Artha 2,6,10; Kama 3,7,11; Moksha 4,8,12)
+  // Purushartha & Stanza metrics pre-computed by backend engine or computed dynamically from chart
   const purusharthas: PurusharthaGroup[] = useMemo(() => {
+    if (chart.purusharthaBalance?.purusharthas && chart.purusharthaBalance.purusharthas.length > 0) {
+      return chart.purusharthaBalance.purusharthas
+    }
+    const validPlanets = (chart.planets || []).filter((p) => !['Lagna', 'Ascendant'].includes(p.name))
+    const total = validPlanets.length || 9
     const dharmaPlanets = validPlanets.filter((p) => [1, 5, 9].includes(p.houseNumber))
     const arthaPlanets = validPlanets.filter((p) => [2, 6, 10].includes(p.houseNumber))
     const kamaPlanets = validPlanets.filter((p) => [3, 7, 11].includes(p.houseNumber))
@@ -54,7 +33,8 @@ export const BhavaPurusharthaBalance: React.FC<BhavaPurusharthaBalanceProps> = (
         color: '#fbbf24',
         bgGradient: 'linear-gradient(135deg, rgba(251, 191, 36, 0.12), rgba(17, 21, 28, 0.8))',
         planets: dharmaPlanets,
-        percentage: Math.round((dharmaPlanets.length / totalPlanets) * 100),
+        count: dharmaPlanets.length,
+        percentage: Math.round((dharmaPlanets.length / total) * 100),
       },
       {
         name: 'Artha',
@@ -64,7 +44,8 @@ export const BhavaPurusharthaBalance: React.FC<BhavaPurusharthaBalanceProps> = (
         color: '#34d399',
         bgGradient: 'linear-gradient(135deg, rgba(52, 211, 153, 0.12), rgba(17, 21, 28, 0.8))',
         planets: arthaPlanets,
-        percentage: Math.round((arthaPlanets.length / totalPlanets) * 100),
+        count: arthaPlanets.length,
+        percentage: Math.round((arthaPlanets.length / total) * 100),
       },
       {
         name: 'Kama',
@@ -74,7 +55,8 @@ export const BhavaPurusharthaBalance: React.FC<BhavaPurusharthaBalanceProps> = (
         color: '#38bdf8',
         bgGradient: 'linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(17, 21, 28, 0.8))',
         planets: kamaPlanets,
-        percentage: Math.round((kamaPlanets.length / totalPlanets) * 100),
+        count: kamaPlanets.length,
+        percentage: Math.round((kamaPlanets.length / total) * 100),
       },
       {
         name: 'Moksha',
@@ -84,23 +66,38 @@ export const BhavaPurusharthaBalance: React.FC<BhavaPurusharthaBalanceProps> = (
         color: '#c084fc',
         bgGradient: 'linear-gradient(135deg, rgba(192, 132, 252, 0.12), rgba(17, 21, 28, 0.8))',
         planets: mokshaPlanets,
-        percentage: Math.round((mokshaPlanets.length / totalPlanets) * 100),
+        count: mokshaPlanets.length,
+        percentage: Math.round((mokshaPlanets.length / total) * 100),
       },
     ]
-  }, [validPlanets, totalPlanets])
+  }, [chart.purusharthaBalance, chart.planets])
 
-  // Determine dominant Purushartha
   const dominantPurushartha = useMemo(() => {
-    const sorted = [...purusharthas].sort((a, b) => b.planets.length - a.planets.length)
-    return sorted[0]
-  }, [purusharthas])
+    const found = purusharthas.find((p) => p.name === chart.purusharthaBalance?.dominantPurushartha)
+    if (found) return found
+    const sorted = [...purusharthas].sort((a, b) => (b.planets?.length || 0) - (a.planets?.length || 0))
+    return (
+      sorted[0] || {
+        name: 'Dharma',
+        sanskrit: 'धर्म',
+        houses: [1, 5, 9],
+        theme: 'Duty and self-realization',
+        color: '#fbbf24',
+        bgGradient: 'linear-gradient(135deg, rgba(251, 191, 36, 0.12), rgba(17, 21, 28, 0.8))',
+        planets: [],
+        count: 0,
+        percentage: 25,
+      }
+    )
+  }, [purusharthas, chart.purusharthaBalance])
 
-  // 2. House Stanzas & Quadrant Classifications
   const stanzas: StanzaGroup[] = useMemo(() => {
+    if (chart.purusharthaBalance?.stanzas && chart.purusharthaBalance.stanzas.length > 0) {
+      return chart.purusharthaBalance.stanzas
+    }
+    const validPlanets = (chart.planets || []).filter((p) => !['Lagna', 'Ascendant'].includes(p.name))
     const kendraPlanets = validPlanets.filter((p) => [1, 4, 7, 10].includes(p.houseNumber))
     const trikonaPlanets = validPlanets.filter((p) => [1, 5, 9].includes(p.houseNumber))
-    const panapharaPlanets = validPlanets.filter((p) => [2, 5, 8, 11].includes(p.houseNumber))
-    const apoklimaPlanets = validPlanets.filter((p) => [3, 6, 9, 12].includes(p.houseNumber))
     const upachayaPlanets = validPlanets.filter((p) => [3, 6, 10, 11].includes(p.houseNumber))
     const dusthanaPlanets = validPlanets.filter((p) => [6, 8, 12].includes(p.houseNumber))
 
@@ -122,22 +119,6 @@ export const BhavaPurusharthaBalance: React.FC<BhavaPurusharthaBalanceProps> = (
         count: trikonaPlanets.length,
       },
       {
-        name: 'Panaphara',
-        sanskrit: 'पणफर (Succedent: 2, 5, 8, 11)',
-        houses: [2, 5, 8, 11],
-        description: 'Houses of material maintenance, accumulation, resource consolidation, and continuous sustaining support.',
-        planets: panapharaPlanets,
-        count: panapharaPlanets.length,
-      },
-      {
-        name: 'Apoklima',
-        sanskrit: 'आपोक्लिम (Cadent: 3, 6, 9, 12)',
-        houses: [3, 6, 9, 12],
-        description: 'Houses of effort, transition, endurance, service, and detachment.',
-        planets: apoklimaPlanets,
-        count: apoklimaPlanets.length,
-      },
-      {
         name: 'Upachaya Sthanas',
         sanskrit: 'उपचय (Growth: 3, 6, 10, 11)',
         houses: [3, 6, 10, 11],
@@ -154,7 +135,7 @@ export const BhavaPurusharthaBalance: React.FC<BhavaPurusharthaBalanceProps> = (
         count: dusthanaPlanets.length,
       },
     ]
-  }, [validPlanets])
+  }, [chart.purusharthaBalance, chart.planets])
 
   return (
     <div className="purushartha-balance-workspace" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -176,10 +157,10 @@ export const BhavaPurusharthaBalance: React.FC<BhavaPurusharthaBalanceProps> = (
             </h3>
             <span style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
               Dominant Aim:{' '}
-              <strong style={{ color: dominantPurushartha.color }}>
-                {dominantPurushartha.name} ({dominantPurushartha.sanskrit})
+              <strong style={{ color: dominantPurushartha?.color || '#fbbf24' }}>
+                {dominantPurushartha?.name || 'Dharma'} ({dominantPurushartha?.sanskrit || 'धर्म'})
               </strong>{' '}
-              with {dominantPurushartha.planets.length} grahas ({dominantPurushartha.percentage}%)
+              with {dominantPurushartha?.planets?.length || 0} grahas ({dominantPurushartha?.percentage || 0}%)
             </span>
           </div>
         </div>
@@ -244,13 +225,13 @@ export const BhavaPurusharthaBalance: React.FC<BhavaPurusharthaBalanceProps> = (
         {/* Astrological Synthesis Paragraph */}
         <p style={{ margin: 0, fontSize: '0.86rem', color: '#cbd5e1', lineHeight: 1.6 }}>
           According to classical Jyotish, this chart exhibits a prominent{' '}
-          <strong style={{ color: dominantPurushartha.color }}>{dominantPurushartha.name} orientation</strong>. The native's
+          <strong style={{ color: dominantPurushartha?.color || '#fbbf24' }}>{dominantPurushartha?.name || 'Dharma'} orientation</strong>. The native's
           innate focus gravitates toward{' '}
-          {dominantPurushartha.name === 'Dharma'
+          {dominantPurushartha?.name === 'Dharma'
             ? 'purposeful self-actualization, philosophical principles, creative integrity, and spiritual legacy.'
-            : dominantPurushartha.name === 'Artha'
+            : dominantPurushartha?.name === 'Artha'
             ? 'tangible material building, professional leadership, resource management, and diligent practical service.'
-            : dominantPurushartha.name === 'Kama'
+            : dominantPurushartha?.name === 'Kama'
             ? 'collaborative alliances, relationship vitality, entrepreneurial ambition, and real-world networking.'
             : 'internal spiritual inquiry, psychological liberation, detachment, and higher mystical understanding.'}
         </p>
@@ -265,7 +246,7 @@ export const BhavaPurusharthaBalance: React.FC<BhavaPurusharthaBalanceProps> = (
         }}
       >
         {purusharthas.map((group) => {
-          const isDominant = group.name === dominantPurushartha.name
+          const isDominant = group.name === (dominantPurushartha?.name || 'Dharma')
           return (
             <div
               key={group.name}

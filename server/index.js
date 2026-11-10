@@ -4,6 +4,24 @@ const fs = require('fs')
 const path = require('path')
 const { DatabaseSync } = require('node:sqlite')
 
+const { buildEnrichedChart } = require('./services/chartBuilder')
+const {
+  normalizeDashaTreeNode,
+  expandDashaSubPeriodsBackend,
+  computeActiveDashaChainBackend,
+  checkDashaSandhiBackend,
+  getActivatedHousesBackend,
+  calculateSambhandhaBackend,
+} = require('./services/dashaService')
+const { calculateAspectsForChart } = require('./services/aspectsService')
+const { computeDignityOverview } = require('./services/dignityService')
+const { computePurusharthaBalance } = require('./services/purusharthaService')
+const { buildVargaComparison, buildShodasavargaCharts } = require('./services/vargasService')
+const { parseSignIndex, formatDms } = require('./services/astroConstants')
+const { computeArudhaPadas } = require('./services/arudhasService')
+const { computeBaadhakas, computeMarakas } = require('./services/longevityService')
+const { normalizeAshtakavarga } = require('./services/ashtakavargaService')
+
 const app = express()
 const port = process.env.PORT || 4000
 const HORA_API = process.env.HORA_API || 'http://localhost:8000'
@@ -19,8 +37,8 @@ db.exec(`
     name TEXT NOT NULL,
     birth_data TEXT,
     payload TEXT,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-  );
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
 `)
 
 // Safe schema migration for pre-existing databases
@@ -50,417 +68,151 @@ async function horaFetch(urlPath, body) {
   return response.json()
 }
 
-const ordinal = (n) => {
-  const r = n % 100
-  if (r >= 11 && r <= 13) return `${n}th`
-  return `${n}${['th', 'st', 'nd', 'rd'][n % 10] || 'th'}`
-}
+/** Compute all chart components with graceful fallbacks for optional sub-calculations. */
+async function computeChart(name, birthData) {
+  const [rasiResult, panchangaResult, dashaResult, vargaResult, shodasavargaResult] = await Promise.allSettled([
+    horaFetch('/v1/chart/rasi', birthData),
+    horaFetch('/v1/panchanga', birthData),
+    horaFetch('/v1/dasha', {
+      ...birthData,
+      system: 'vimshottari',
+      levels: 3,
+      cycles: 1,
+      reckon_from: 'moon',
+      as_of: new Date().toISOString(),
+    }),
+    horaFetch('/v1/chart/varga-catalog'),
+    horaFetch('/v1/chart/shodasavarga', birthData),
+  ])
 
-const SIGN_LORDS = {
-  Aries: 'Mars', Taurus: 'Venus', Gemini: 'Mercury', Cancer: 'Moon',
-  Leo: 'Sun', Virgo: 'Mercury', Libra: 'Venus', Scorpio: 'Mars',
-  Sagittarius: 'Jupiter', Capricorn: 'Saturn', Aquarius: 'Saturn', Pisces: 'Jupiter',
-}
-
-const VIMSHOTTARI_CYCLE = [
-  { name: 'Ketu', years: 7 },
-  { name: 'Venus', years: 20 },
-  { name: 'Sun', years: 6 },
-  { name: 'Moon', years: 10 },
-  { name: 'Mars', years: 7 },
-  { name: 'Rahu', years: 18 },
-  { name: 'Jupiter', years: 16 },
-  { name: 'Saturn', years: 19 },
-  { name: 'Mercury', years: 17 },
-]
-
-const NATURAL_FRIENDSHIP = {
-  Sun: { friends: ['Moon', 'Mars', 'Jupiter'], enemies: ['Venus', 'Saturn'], neutrals: ['Mercury'] },
-  Moon: { friends: ['Sun', 'Mercury'], enemies: [], neutrals: ['Mars', 'Jupiter', 'Venus', 'Saturn'] },
-  Mars: { friends: ['Sun', 'Moon', 'Jupiter'], enemies: ['Mercury'], neutrals: ['Venus', 'Saturn'] },
-  Mercury: { friends: ['Sun', 'Venus'], enemies: ['Moon'], neutrals: ['Mars', 'Jupiter', 'Saturn'] },
-  Jupiter: { friends: ['Sun', 'Moon', 'Mars'], enemies: ['Mercury', 'Venus'], neutrals: ['Saturn'] },
-  Venus: { friends: ['Mercury', 'Saturn'], enemies: ['Sun', 'Moon'], neutrals: ['Mars', 'Jupiter'] },
-  Saturn: { friends: ['Mercury', 'Venus'], enemies: ['Sun', 'Moon', 'Mars'], neutrals: ['Jupiter'] },
-  Rahu: { friends: ['Venus', 'Saturn', 'Mercury'], enemies: ['Sun', 'Moon', 'Mars'], neutrals: ['Jupiter'] },
-  Ketu: { friends: ['Mars', 'Venus', 'Saturn'], enemies: ['Sun', 'Moon'], neutrals: ['Mercury', 'Jupiter'] },
-}
-
-/** Recursively normalize dasha periods into clean domain objects */
-function normalizeDashaTreeNode(p, level = 1) {
-  if (!p) return null
-  const lordName = p.lord_name || p.lord || p.period || 'Unknown'
-  const nodeLevel = p.level || level
-  const nodeStart = p.start || ''
-  const nodeEnd = p.end || ''
-  const startMs = new Date(nodeStart).getTime()
-  const endMs = new Date(nodeEnd).getTime()
-  const durationDays = p.duration_days ?? p.durationDays ?? (isNaN(startMs) || isNaN(endMs) ? 0 : Math.round((endMs - startMs) / (24 * 3600 * 1000)))
-
-  return {
-    lord: lordName,
-    lord_name: lordName,
-    period: lordName,
-    level: nodeLevel,
-    start: nodeStart,
-    end: nodeEnd,
-    start_jd: p.start_jd,
-    end_jd: p.end_jd,
-    durationDays,
-    duration_days: durationDays,
-    children: Array.isArray(p.children)
-      ? p.children.map((c) => normalizeDashaTreeNode(c, nodeLevel + 1)).filter(Boolean)
-      : [],
-  }
-}
-
-/**
- * Backend dasha sub-period expansion down to any target level (Level 1..6)
- */
-function expandDashaSubPeriodsBackend(parent, targetLevel = (parent?.level || 1) + 1) {
-  if (!parent) return []
-  const currentLevel = parent.level || 1
-  if (targetLevel <= currentLevel) return []
-
-  const parentLordClean = (parent.lord_name || parent.lord || parent.period || '').trim().toLowerCase()
-  let parentLordIdx = VIMSHOTTARI_CYCLE.findIndex(
-    (v) => v.name.toLowerCase() === parentLordClean
-  )
-  if (parentLordIdx < 0) parentLordIdx = 0
-  const parentYears = VIMSHOTTARI_CYCLE[parentLordIdx].years
-
-  let startMs = parent.start ? new Date(parent.start).getTime() : NaN
-  let endMs = parent.end ? new Date(parent.end).getTime() : NaN
-  if (isNaN(startMs)) {
-    startMs = Date.now()
-  }
-  if (isNaN(endMs) || endMs <= startMs) {
-    const fraction = currentLevel === 1 ? parentYears : parentYears / 120
-    const durationMs = fraction * 365.25 * 24 * 3600 * 1000
-    endMs = startMs + durationMs
+  if (rasiResult.status !== 'fulfilled') {
+    throw rasiResult.reason
   }
 
-  const spanMs = endMs - startMs
-  const nextLevel = currentLevel + 1
-  const children = []
-  let cursor = startMs
+  const rasi = rasiResult.value
+  const panchanga = panchangaResult.status === 'fulfilled' ? panchangaResult.value : null
+  const dasha = dashaResult.status === 'fulfilled' ? dashaResult.value : null
+  const vargaCatalog = vargaResult.status === 'fulfilled' ? vargaResult.value : null
+  const shodasavarga = shodasavargaResult.status === 'fulfilled' ? shodasavargaResult.value : null
 
-  for (let k = 0; k < 9; k++) {
-    const subIdx = (parentLordIdx + k) % 9
-    const subMeta = VIMSHOTTARI_CYCLE[subIdx]
-    const subFraction = subMeta.years / 120
-    const subSpanMs = spanMs * subFraction
-    const subStart = new Date(cursor)
-    const subEnd = new Date(cursor + subSpanMs)
-
-    const childNode = {
-      lord: subMeta.name,
-      lord_name: subMeta.name,
-      period: subMeta.name,
-      level: nextLevel,
-      start: subStart.toISOString().replace('T', ' ').slice(0, nextLevel >= 5 ? 19 : nextLevel >= 4 ? 16 : 10),
-      end: subEnd.toISOString().replace('T', ' ').slice(0, nextLevel >= 5 ? 19 : nextLevel >= 4 ? 16 : 10),
-      durationDays: subSpanMs / (24 * 3600 * 1000),
-      duration_days: subSpanMs / (24 * 3600 * 1000),
-      children: [],
+  // Build maps for sub-calculations
+  const rasisMap = {}
+  const refSigns = {}
+  for (const g of rasi.grahas || []) {
+    rasisMap[g.id] = g.rasi
+    if (['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn'].includes(g.name)) {
+      refSigns[g.name] = g.rasi
     }
-
-    if (nextLevel < targetLevel) {
-      childNode.children = expandDashaSubPeriodsBackend(childNode, targetLevel)
-    }
-
-    children.push(childNode)
-    cursor += subSpanMs
   }
+  const lagnaRasiIdx = rasi.lagna?.rasi ?? 0
+  refSigns['Lagna'] = lagnaRasiIdx
 
-  return children
-}
+  // Fetch all specialized Vedic calculation modules in parallel
+  const [
+    aspectsRes,
+    yogasRes,
+    relationshipsRes,
+    arudhasRes,
+    baadhakasRes,
+    marakasRes,
+    ashtakavargaRes,
+    argalasRes,
+    functionalRes,
+    vakriRes,
+  ] = await Promise.allSettled([
+    horaFetch('/v1/aspect/chart', {
+      rasis: rasisMap,
+      lagna_rasi: lagnaRasiIdx,
+      rahu_ketu_aspects: true,
+    }),
+    horaFetch('/v1/planetary-yoga/chart', {
+      rasis: rasisMap,
+      lagna_rasi: lagnaRasiIdx,
+      include_nodes: true,
+    }),
+    horaFetch('/v1/relationship/chart', {
+      rasis: rasisMap,
+      include_nodes: true,
+    }),
+    horaFetch('/v1/arudha/table', {
+      lagna_sign: lagnaRasiIdx,
+      graha_signs: rasisMap,
+    }),
+    horaFetch('/v1/baadhakas/chart', {
+      lagna_sign: lagnaRasiIdx,
+      graha_signs: rasisMap,
+    }),
+    horaFetch('/v1/marakas', {
+      lagna: lagnaRasiIdx,
+      graha_signs: rasisMap,
+    }),
+    horaFetch('/v1/ashtakavarga/chart', {
+      reference_signs: refSigns,
+    }),
+    horaFetch('/v1/argala/chart', {
+      rasis: rasisMap,
+      lagna_rasi: lagnaRasiIdx,
+    }),
+    horaFetch(`/v1/functional/lagna?sign=${lagnaRasiIdx}`),
+    horaFetch('/v1/astrology/vakri-analysis/batch', {
+      birth_data: {
+        year: birthData.year,
+        month: birthData.month,
+        day: birthData.day,
+        hour: birthData.hour || 0,
+        minute: birthData.minute || 0,
+        second: birthData.second || 0,
+        tz_name: birthData.tz_name,
+        latitude: birthData.place?.latitude || birthData.latitude,
+        longitude: birthData.place?.longitude || birthData.longitude,
+      },
+      calculation_settings: {
+        ayanamsa: birthData.settings?.ayanamsa || 'Lahiri',
+        house_system: birthData.settings?.house_system || 'Whole Sign',
+        node_type: birthData.settings?.node_type || 'True',
+      },
+      analysis_settings: {
+        tradition: 'Parashari',
+        include_jataka_parijata: true,
+        include_phaladeepika: true,
+        include_saravali: true,
+        include_horasara: true,
+        include_uttara_kalamrita: true,
+        include_house_offsets: Boolean(birthData.include_house_offsets),
+      },
+    }),
+  ])
 
-/**
- * Computes the complete 6-level active running chain (MD, AD, PD, SD, PrD, DD) on the backend
- */
-function computeActiveDashaChainBackend(dashas, targetDate = new Date()) {
-  const targetMs = typeof targetDate === 'number' ? targetDate : new Date(targetDate).getTime()
-  const chain = []
-  if (!Array.isArray(dashas) || dashas.length === 0) return chain
+  const aspects = aspectsRes.status === 'fulfilled' ? aspectsRes.value : null
+  const yogas = yogasRes.status === 'fulfilled' ? yogasRes.value : null
+  const relationships = relationshipsRes.status === 'fulfilled' ? relationshipsRes.value : null
+  const arudhas = arudhasRes.status === 'fulfilled' ? arudhasRes.value : null
+  const baadhakas = baadhakasRes.status === 'fulfilled' ? baadhakasRes.value : null
+  const marakas = marakasRes.status === 'fulfilled' ? marakasRes.value : null
+  const ashtakavarga = ashtakavargaRes.status === 'fulfilled' ? ashtakavargaRes.value : null
+  const argalas = argalasRes.status === 'fulfilled' ? argalasRes.value : null
+  const functional = functionalRes.status === 'fulfilled' ? functionalRes.value : null
+  const vakriAnalysis = vakriRes.status === 'fulfilled' ? vakriRes.value : null
 
-  // 1. Mahadasha
-  const md = dashas.find((d) => {
-    const s = new Date(d.start).getTime()
-    const e = new Date(d.end).getTime()
-    return targetMs >= s && targetMs <= e
-  }) || dashas[0]
-  if (!md) return chain
-
-  chain.push({ level: 1, levelLabel: 'MD', lord: md.lord || md.period, period: md })
-
-  // 2. Antardasha (AD)
-  const adList = (md.children && md.children.length > 0) ? md.children : expandDashaSubPeriodsBackend(md, 2)
-  const ad = adList.find((d) => {
-    const s = new Date(d.start).getTime()
-    const e = new Date(d.end).getTime()
-    return targetMs >= s && targetMs <= e
-  }) || adList[0]
-  if (!ad) return chain
-
-  chain.push({ level: 2, levelLabel: 'AD', lord: ad.lord, period: ad })
-
-  // 3. Pratyantardasha (PD)
-  const pdList = (ad.children && ad.children.length > 0) ? ad.children : expandDashaSubPeriodsBackend(ad, 3)
-  const pd = pdList.find((d) => {
-    const s = new Date(d.start).getTime()
-    const e = new Date(d.end).getTime()
-    return targetMs >= s && targetMs <= e
-  }) || pdList[0]
-  if (!pd) return chain
-
-  chain.push({ level: 3, levelLabel: 'PD', lord: pd.lord, period: pd })
-
-  // 4. Sookshma (SD)
-  const sdList = (pd.children && pd.children.length > 0) ? pd.children : expandDashaSubPeriodsBackend(pd, 4)
-  const sd = sdList.find((d) => {
-    const s = new Date(d.start).getTime()
-    const e = new Date(d.end).getTime()
-    return targetMs >= s && targetMs <= e
-  }) || sdList[0]
-  if (!sd) return chain
-
-  chain.push({ level: 4, levelLabel: 'SD', lord: sd.lord, period: sd })
-
-  // 5. Prana (PrD)
-  const prdList = (sd.children && sd.children.length > 0) ? sd.children : expandDashaSubPeriodsBackend(sd, 5)
-  const prd = prdList.find((d) => {
-    const s = new Date(d.start).getTime()
-    const e = new Date(d.end).getTime()
-    return targetMs >= s && targetMs <= e
-  }) || prdList[0]
-  if (!prd) return chain
-
-  chain.push({ level: 5, levelLabel: 'PrD', lord: prd.lord, period: prd })
-
-  // 6. Deha (DD)
-  const ddList = (prd.children && prd.children.length > 0) ? prd.children : expandDashaSubPeriodsBackend(prd, 6)
-  const dd = ddList.find((d) => {
-    const s = new Date(d.start).getTime()
-    const e = new Date(d.end).getTime()
-    return targetMs >= s && targetMs <= e
-  }) || ddList[0]
-  if (dd) {
-    chain.push({ level: 6, levelLabel: 'DD', lord: dd.lord, period: dd })
-  }
-
-  return chain
-}
-
-/**
- * Classical Vedic Sambhandha calculated on the backend
- */
-function calculateSambhandhaBackend(lordA, lordB, chart) {
-  if (!lordA || !lordB || !chart) return null
-  const cleanA = lordA.trim().toLowerCase()
-  const cleanB = lordB.trim().toLowerCase()
-
-  const pA = (chart.planets || []).find((p) => p.name.toLowerCase() === cleanA)
-  const pB = (chart.planets || []).find((p) => p.name.toLowerCase() === cleanB)
-
-  if (!pA || !pB) return null
-
-  const houseA = pA.houseNumber || pA.house || 1
-  const houseB = pB.houseNumber || pB.house || 1
-
-  const distFromAtoB = ((houseB - houseA + 12) % 12) + 1
-  const distFromBtoA = ((houseA - houseB + 12) % 12) + 1
-
-  let axisLabel = `${distFromAtoB}/${distFromBtoA}`
-  let category = 'Dynamic Action'
-  let synthesis = ''
-  let bphsGuidance = ''
-
-  if (distFromAtoB === 1) {
-    axisLabel = '1/1 (Yuti / Conjunction)'
-    category = 'Conjunction'
-    synthesis = `Intense energy fusion in the ${ordinal(houseA)} House (${pA.sign}). The portfolios of both ${pA.name} and ${pB.name} manifest simultaneously.`
-    bphsGuidance = 'Combined results of both planets manifest directly in the occupied bhava. Auspicious if both are natural benefics or functional friends; requires remedies if afflicted.'
-  } else if (distFromAtoB === 7) {
-    axisLabel = '1/7 (Samasaptaka / Direct Aspect)'
-    category = 'Mutual Aspect'
-    synthesis = `Direct polar mutual aspect across the ${ordinal(houseA)} and ${ordinal(houseB)} houses. Creates dynamic awareness, interpersonal developments, and external encounters.`
-    bphsGuidance = 'Mutual activation of opposite houses. Promotes public visibility, relationship negotiations, and balancing opposing life polarities.'
-  } else if (distFromAtoB === 5 || distFromAtoB === 9) {
-    axisLabel = '5/9 (Nava-Panchama / Trikona)'
-    category = 'Auspicious'
-    synthesis = `Harmonious 5/9 Trikona axis (Lakshmi Sthana). The lords support each other naturally, bestowing divine grace, intelligence, and fortune.`
-    bphsGuidance = 'Classical Brihat Parashara Hora Shastra confirms high auspiciousness. Favorable for wealth accrual, spiritual advancement, higher education, and joy from progeny.'
-  } else if (distFromAtoB === 3 || distFromAtoB === 11) {
-    axisLabel = '3/11 (Trishad-Aya / Upachaya)'
-    category = 'Favorable Growth'
-    synthesis = `Favorable 3/11 growth axis (Upachaya). Facilitates networking, enterprise, courage, friendship, and steady realization of long-held desires.`
-    bphsGuidance = 'Progressive improvement over time. The sub-period rewards strategic initiative, commercial enterprise, and assistance from elder siblings or mentors.'
-  } else if (distFromAtoB === 4 || distFromAtoB === 10) {
-    axisLabel = '4/10 (Kendra / Quadrant)'
-    category = 'Dynamic Action'
-    synthesis = `Dynamic 4/10 angular alignment (Vishnu Sthana). Stimulates active public karma, career responsibilities, domestic changes, and worldly standing.`
-    bphsGuidance = 'Period of visible work and decisive worldly action. Balanced effort between domestic foundations (4th) and professional leadership (10th) brings elevation.'
-  } else if (distFromAtoB === 6 || distFromAtoB === 8) {
-    axisLabel = '6/8 (Shadashtaka / Friction)'
-    category = 'Challenging Friction'
-    synthesis = `Challenging 6/8 Shadashtak axis. Brings sudden transformations, latent vulnerabilities to the surface, and tests stamina through opposition or disputes.`
-    bphsGuidance = 'Classical texts advise prudence, health vigilance, and avoiding unnecessary conflicts or speculative gambles. Remedial propitiation strongly recommended.'
-  } else if (distFromAtoB === 2 || distFromAtoB === 12) {
-    axisLabel = '2/12 (Dwirdwadasa / Expenditure)'
-    category = 'Expenditure & Shift'
-    synthesis = `2/12 Dwirdwadasa axis. Points toward reallocation of resources, major financial investments, foreign travels, or inward spiritual introspection.`
-    bphsGuidance = 'Funds and energy are directed toward expenses, relocations, or charitable/spiritual avenues. Focus on conserving resources and avoiding impulsive outlays.'
-  }
-
-  const normA = pA.name in NATURAL_FRIENDSHIP ? pA.name : 'Sun'
-  const naturalObj = NATURAL_FRIENDSHIP[normA] || { friends: [], enemies: [], neutrals: [] }
-  let natScore = 0
-  let naturalMaitri = 'Neutral'
-  if (naturalObj.friends.some((f) => f.toLowerCase() === cleanB)) {
-    natScore = 1
-    naturalMaitri = 'Friend'
-  } else if (naturalObj.enemies.some((e) => e.toLowerCase() === cleanB)) {
-    natScore = -1
-    naturalMaitri = 'Enemy'
-  }
-
-  const isTemporalFriend = [2, 3, 4, 10, 11, 12].includes(distFromAtoB)
-  const tempScore = isTemporalFriend ? 1 : -1
-  const temporalMaitri = isTemporalFriend ? 'Friend' : 'Enemy'
-
-  const totalScore = natScore + tempScore
-  let compoundMaitri = 'Sama'
-  if (totalScore === 2) compoundMaitri = 'Adhi-Mitra'
-  else if (totalScore === 1) compoundMaitri = 'Mitra'
-  else if (totalScore === 0) compoundMaitri = 'Sama'
-  else if (totalScore === -1) compoundMaitri = 'Shatru'
-  else if (totalScore === -2) compoundMaitri = 'Adhi-Shatru'
-
-  return {
-    distFromAtoB,
-    distFromBtoA,
-    axisLabel,
-    category,
-    naturalMaitri,
-    temporalMaitri,
-    compoundMaitri,
-    synthesis,
-    bphsGuidance,
-  }
-}
-
-/** Build a unified chart payload from multiple Hora API responses. */
-function buildChartPayload(name, birthData, rasi, panchanga, dasha, vargaCatalog, shodasavarga, aspects, yogas, relationships) {
-
-  const planets = (rasi?.grahas || []).map((p) => {
-    let lordHouses = p.lord_of_houses
-    if (!lordHouses || lordHouses.length === 0) {
-      lordHouses = (rasi?.bhavas || [])
-        .filter((b) => SIGN_LORDS[b.rasi_name] === p.name)
-        .map((b) => b.house)
-    }
-    return {
-      name: p.name,
-      sign: p.rasi_name,
-      degree: p.dms || `${p.degrees_in_rasi.toFixed(0)}°`,
-      nakshatra: `${p.nakshatra_name} • Pada ${p.pada}`,
-      house: ordinal(p.house),
-      houseNumber: p.house,
-      retrograde: Boolean(p.retrograde),
-      combust: Boolean(p.combust),
-      status: p.dignity || 'Calculated',
-      // Rich astronomical properties
-      id: p.id,
-      longitude: p.longitude,
-      latitude: p.latitude,
-      speed: p.speed,
-      degrees_in_rasi: p.degrees_in_rasi,
-      dms: p.dms,
-      sign_dm: p.sign_dm,
-      rasi_dm: p.rasi_dm,
-      rasi_index: p.rasi,
-      nakshatra_number: p.nakshatra,
-      nakshatra_name: p.nakshatra_name,
-      pada: p.pada,
-      house_labels: p.house_labels || [],
-      dignity: p.dignity,
-      sun_separation: p.sun_separation,
-      lord_of_houses: lordHouses || [],
-    }
-  })
-
-  const houses = (rasi?.bhavas || []).map((b) => ({
-    number: b.house,
-    name: `${ordinal(b.house)} House`,
-    sign: b.rasi_name,
-    lord: SIGN_LORDS[b.rasi_name] || '—',
-    occupants: planets.filter((p) => p.houseNumber === b.house).map((p) => p.name),
-    start: b.start,
-    middle: b.middle,
-    end: b.end,
-    rasi_index: b.rasi,
-  }))
-
-  const lagna = rasi?.lagna
-  const moon = (rasi?.grahas || []).find((p) => p.name === 'Moon')
-  const sun = (rasi?.grahas || []).find((p) => p.name === 'Sun')
-
-  const runningDasha = (dasha?.running || []).map((d) => d.lord_name)
-  const firstDasha = dasha?.periods?.[0]
-  const currentDasha = runningDasha.length
-    ? runningDasha.join(' / ')
-    : firstDasha
-      ? `${firstDasha.lord_name} • ${firstDasha.start.slice(0, 4)}–${firstDasha.end.slice(0, 4)}`
-      : 'Unavailable'
-
-  return {
+  return buildEnrichedChart(
     name,
-    date: rasi?.input?.local_time || '',
-    time: rasi?.input?.local_time || '',
-    location: rasi?.input?.place?.name || birthData.place?.name || '',
-    latitude: `${rasi?.input?.place?.latitude ?? birthData.place?.latitude ?? ''}°`,
-    longitude: `${rasi?.input?.place?.longitude ?? birthData.place?.longitude ?? ''}°`,
-    timezone: rasi?.input?.timezone || birthData.tz_name || '',
-    lagna: lagna ? `${lagna.rasi_name} ${lagna.dms}` : 'Unavailable',
-    moon: moon ? `${moon.rasi_name} ${moon.dms}` : 'Unavailable',
-    moonNakshatra: moon ? `${moon.nakshatra_name} • Pada ${moon.pada}` : 'Unavailable',
-    sunSign: sun?.rasi_name || 'Unavailable',
-    currentMahadasha: currentDasha,
-    ayanamsa: rasi?.ayanamsa?.dms || 'Unavailable',
-    calculationSettings: `${rasi?.settings?.ayanamsa || 'Unknown'} ayanamsha • ${rasi?.settings?.house_system || 'Unknown'} houses`,
-    planets,
-    houses,
-    vargas: (vargaCatalog?.named || []).map((v) => ({
-      code: v.code,
-      title: v.name,
-      purpose: `${v.divisions} divisions`,
-      divisions: v.divisions,
-      status: shodasavarga?.charts?.[v.code] ? 'Calculated' : 'Available',
-    })),
-    dashas: (() => {
-      const normalized = (dasha?.periods || []).slice(0, 9).map((d, i) => {
-        const norm = normalizeDashaTreeNode(d, 1)
-        norm.color = ['#c9a66b', '#7ec8c9', '#ed9e7a', '#a67ec9', '#c97e93', '#7ec98a', '#d4b483', '#5a9bc9', '#c9917e'][i % 9]
-        norm.label = 'Mahadasha'
-        return norm
-      })
-      return normalized
-    })(),
-    get activeDashaChain() {
-      return computeActiveDashaChainBackend(this.dashas, new Date())
-    },
-    relationships: relationships || null,
-    source: `${panchanga?.date_local || 'Hora'} • ${panchanga?.tithi?.[0]?.name || 'Panchanga'}`,
     birthData,
-    // Deep technical payloads from the Hora Calculation API
-    rawRasi: rasi,
-    rawPanchanga: panchanga,
-    rawDasha: dasha,
-    shodasavarga: shodasavarga?.charts || null,
-    aspects: aspects || null,
-    yogas: yogas || null,
-  }
+    rasi,
+    panchanga,
+    dasha,
+    vargaCatalog,
+    shodasavarga,
+    aspects,
+    yogas,
+    relationships,
+    arudhas,
+    baadhakas,
+    marakas,
+    ashtakavarga,
+    argalas,
+    functional,
+    vakriAnalysis
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -468,7 +220,7 @@ function buildChartPayload(name, birthData, rasi, panchanga, dasha, vargaCatalog
 // ---------------------------------------------------------------------------
 
 app.use(cors())
-app.use(express.json({ limit: '1mb' }))
+app.use(express.json({ limit: '2mb' }))
 
 // ---------------------------------------------------------------------------
 // Health
@@ -503,82 +255,83 @@ app.use('/api/hora', async (req, res) => {
   }
 })
 
-/** Compute all chart components with graceful fallbacks for optional sub-calculations. */
-async function computeChart(name, birthData) {
-  const [rasiResult, panchangaResult, dashaResult, vargaResult, shodasavargaResult] = await Promise.allSettled([
-    horaFetch('/v1/chart/rasi', birthData),
-    horaFetch('/v1/panchanga', birthData),
-    horaFetch('/v1/dasha', {
-      ...birthData,
-      system: 'vimshottari',
-      levels: 3,
-      cycles: 1,
-      reckon_from: 'moon',
-      as_of: new Date().toISOString(),
-    }),
-    horaFetch('/v1/chart/varga-catalog'),
-    horaFetch('/v1/chart/shodasavarga', birthData),
-  ])
+// ---------------------------------------------------------------------------
+// Live chart: Compute a fresh chart via the Python Hora API & Backend Enrichment
+// ---------------------------------------------------------------------------
 
-  if (rasiResult.status !== 'fulfilled') {
-    throw rasiResult.reason
+app.post('/api/compute', async (req, res) => {
+  const birthData = req.body
+  if (!birthData || !birthData.year || !birthData.month || !birthData.day) {
+    return res.status(400).json({ error: 'Birth data (year, month, day) is required' })
   }
 
-  const rasi = rasiResult.value
-  const panchanga = panchangaResult.status === 'fulfilled' ? panchangaResult.value : null
-  const dasha = dashaResult.status === 'fulfilled' ? dashaResult.value : null
-  const vargaCatalog = vargaResult.status === 'fulfilled' ? vargaResult.value : null
-  const shodasavarga = shodasavargaResult.status === 'fulfilled' ? shodasavargaResult.value : null
-
-  // Fetch aspects if rasi succeeded
-  let aspects = null
   try {
-    const rasisMap = {}
-    for (const g of rasi.grahas || []) {
-      rasisMap[g.id] = g.rasi
-    }
-    aspects = await horaFetch('/v1/aspect/chart', {
-      rasis: rasisMap,
-      lagna_rasi: rasi.lagna?.rasi ?? 0,
-      rahu_ketu_aspects: true,
-    })
+    const chart = await computeChart(birthData.name || 'Live chart', birthData)
+    return res.json(chart)
   } catch (err) {
-    // Aspects can be calculated client-side in adapter if endpoint fails
+    return res.status(err.status || 502).json({
+      error: `Hora calculation failed: ${err.message}`,
+    })
   }
+})
 
-  // Fetch yogas if rasi succeeded
-  let yogas = null
+// ---------------------------------------------------------------------------
+// Vakri Graha Intelligence Engine Endpoints (PRD Section 22)
+// ---------------------------------------------------------------------------
+
+app.post(['/api/v1/astrology/vakri-analysis', '/api/astrology/vakri-analysis'], async (req, res) => {
   try {
-    const rasisMap = {}
-    for (const g of rasi.grahas || []) {
-      rasisMap[g.id] = g.rasi
-    }
-    yogas = await horaFetch('/v1/planetary-yoga/chart', {
-      rasis: rasisMap,
-      lagna_rasi: rasi.lagna?.rasi ?? 0,
-      include_nodes: true,
-    })
+    const result = await horaFetch('/v1/astrology/vakri-analysis', req.body)
+    res.json(result)
   } catch (err) {
-    // Yogas endpoint optional
+    res.status(err.status || 500).json({ error: err.message })
   }
+})
 
-  // Fetch classical relationships if rasi succeeded
-  let relationships = null
+app.post(['/api/v1/astrology/vakri-analysis/batch', '/api/astrology/vakri-analysis/batch'], async (req, res) => {
   try {
-    const rasisMap = {}
-    for (const g of rasi.grahas || []) {
-      rasisMap[g.id] = g.rasi
-    }
-    relationships = await horaFetch('/v1/relationship/chart', {
-      rasis: rasisMap,
-      include_nodes: true,
-    })
+    const result = await horaFetch('/v1/astrology/vakri-analysis/batch', req.body)
+    res.json(result)
   } catch (err) {
-    // Relationships can be calculated via backend endpoint
+    res.status(err.status || 500).json({ error: err.message })
   }
+})
 
-  return buildChartPayload(name, birthData, rasi, panchanga, dasha, vargaCatalog, shodasavarga, aspects, yogas, relationships)
-}
+app.get(['/api/v1/astrology/vakri-rules', '/api/astrology/vakri-rules'], async (_req, res) => {
+  try {
+    const result = await horaFetch('/v1/astrology/vakri-rules')
+    res.json(result)
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message })
+  }
+})
+
+app.get(['/api/v1/astrology/rules/:ruleId', '/api/astrology/rules/:ruleId'], async (req, res) => {
+  try {
+    const result = await horaFetch(`/v1/astrology/rules/${req.params.ruleId}`)
+    res.json(result)
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message })
+  }
+})
+
+app.get(['/api/v1/astrology/sources', '/api/astrology/sources'], async (_req, res) => {
+  try {
+    const result = await horaFetch('/v1/astrology/sources')
+    res.json(result)
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message })
+  }
+})
+
+app.get(['/api/v1/astrology/conflicts', '/api/astrology/conflicts'], async (_req, res) => {
+  try {
+    const result = await horaFetch('/v1/astrology/conflicts')
+    res.json(result)
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message })
+  }
+})
 
 // ---------------------------------------------------------------------------
 // Backend Dasha Expansion & Timing Endpoints
@@ -627,15 +380,15 @@ app.post(['/api/dasha/expand', '/api/dasha/subperiods'], async (req, res) => {
 })
 
 /**
- * Compute active 6-level running dasha chain (MD, AD, PD, SD, PrD, DD) on the backend
+ * Calculate active dasha chain for an asOf date on the backend
  */
-app.post('/api/dasha/running-chain', (req, res) => {
+app.post('/api/dasha/active-chain', (req, res) => {
   try {
-    const { dashas, targetTime } = req.body || {}
+    const { dashas, asOf } = req.body
     if (!dashas || !Array.isArray(dashas)) {
       return res.status(400).json({ error: 'dashas array is required' })
     }
-    const chain = computeActiveDashaChainBackend(dashas, targetTime ? new Date(targetTime) : new Date())
+    const chain = computeActiveDashaChainBackend(dashas, asOf ? new Date(asOf) : new Date())
     return res.json({ chain })
   } catch (err) {
     return res.status(500).json({ error: err.message })
@@ -643,44 +396,384 @@ app.post('/api/dasha/running-chain', (req, res) => {
 })
 
 /**
- * Compute classical Vedic Sambhandha on the backend
+ * Check dasha sandhi (boundary transition) on the backend
  */
-app.post(['/api/relationship/sambhandha', '/api/sambhandha'], (req, res) => {
+app.post('/api/dasha/sandhi', (req, res) => {
   try {
-    const { lordA, lordB, chart } = req.body || {}
-    if (!lordA || !lordB || !chart) {
-      return res.status(400).json({ error: 'lordA, lordB, and chart are required' })
+    const { period, asOf } = req.body
+    if (!period) {
+      return res.status(400).json({ error: 'period object is required' })
     }
-    const result = calculateSambhandhaBackend(lordA, lordB, chart)
+    const sandhi = checkDashaSandhiBackend(period, asOf ? new Date(asOf) : new Date())
+    return res.json({ sandhi })
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+/**
+ * Get activated houses for a dasha period lord on the backend
+ */
+app.post('/api/dasha/activated-houses', (req, res) => {
+  try {
+    const { lordName, chart } = req.body
+    if (!lordName || !chart) {
+      return res.status(400).json({ error: 'lordName and chart are required' })
+    }
+    const houses = getActivatedHousesBackend(lordName, chart)
+    return res.json({ houses })
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+/**
+ * Calculate Sambhandha relationship between two planets on the backend
+ */
+app.post('/api/dasha/sambhandha', (req, res) => {
+  try {
+    const { planetA, planetB, chart } = req.body
+    if (!planetA || !planetB || !chart) {
+      return res.status(400).json({ error: 'planetA, planetB, and chart are required' })
+    }
+    const sambhandha = calculateSambhandhaBackend(planetA, planetB, chart)
+    return res.json(sambhandha)
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+// ---------------------------------------------------------------------------
+// Backend Astrological Analysis Endpoints
+// ---------------------------------------------------------------------------
+
+/**
+ * Calculate Aspects Matrix (9 Grahas x 12 Bhavas) on the backend
+ */
+app.post('/api/analysis/aspects-matrix', (req, res) => {
+  try {
+    const { planets, houses, lagnaSignIndex } = req.body
+    if (!planets || !houses) {
+      return res.status(400).json({ error: 'planets and houses are required' })
+    }
+    const result = calculateAspectsForChart(planets, houses, lagnaSignIndex || 0)
     return res.json(result)
   } catch (err) {
     return res.status(500).json({ error: err.message })
   }
 })
 
-
-// ---------------------------------------------------------------------------
-// Live chart: Compute a fresh chart via the Python Hora API
-// ---------------------------------------------------------------------------
-
-app.post('/api/compute', async (req, res) => {
-  const birthData = req.body
-  if (!birthData || !birthData.year || !birthData.month || !birthData.day) {
-    return res.status(400).json({ error: 'Birth data (year, month, day) is required' })
-  }
-
+/**
+ * Calculate Dignity & Strength Overview on the backend
+ */
+app.post('/api/analysis/dignity-overview', (req, res) => {
   try {
-    const chart = await computeChart(birthData.name || 'Live chart', birthData)
-    return res.json(chart)
+    const planets = req.body?.planets || req.body?.chart?.planets
+    if (!planets) {
+      return res.status(400).json({ error: 'planets array is required' })
+    }
+    const result = computeDignityOverview(planets)
+    return res.json(result)
   } catch (err) {
-    return res.status(err.status || 502).json({
-      error: `Hora calculation failed: ${err.message}`,
-    })
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+/**
+ * Calculate Purushartha & Stanza Balance on the backend
+ */
+app.post('/api/analysis/purushartha-balance', (req, res) => {
+  try {
+    const planets = req.body?.planets || req.body?.chart?.planets
+    if (!planets) {
+      return res.status(400).json({ error: 'planets array is required' })
+    }
+    const result = computePurusharthaBalance(planets)
+    return res.json(result)
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+/**
+ * Calculate Varga Comparison (D1 vs D9) on the backend
+ */
+app.post('/api/analysis/varga-comparison', (req, res) => {
+  try {
+    const chart = req.body?.chart || req.body
+    if (!chart || !chart.planets || !chart.vargas) {
+      return res.status(400).json({ error: 'chart with planets and vargas is required' })
+    }
+    const result = buildVargaComparison(chart.vargas['D1'], chart.vargas['D9'], chart.planets)
+    return res.json(result)
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+/**
+ * Calculate Arudhas (A1-A12, AL, UL)
+ */
+app.post('/api/analysis/arudhas', async (req, res) => {
+  try {
+    const { lagnaSignIndex, planets, rasisMap } = req.body
+    let rawArudhas = null
+    try {
+      rawArudhas = await horaFetch('/v1/arudha/table', {
+        lagna_sign: lagnaSignIndex,
+        graha_signs: rasisMap || {},
+      })
+    } catch {}
+    const result = computeArudhaPadas(lagnaSignIndex, planets || [], rawArudhas)
+    return res.json(result)
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+/**
+ * Calculate Baadhakas
+ */
+app.post('/api/analysis/baadhakas', async (req, res) => {
+  try {
+    const { lagnaSignIndex, planets, rasisMap } = req.body
+    let rawBaadhakas = null
+    try {
+      rawBaadhakas = await horaFetch('/v1/baadhakas/chart', {
+        lagna_sign: lagnaSignIndex,
+        graha_signs: rasisMap || {},
+      })
+    } catch {}
+    const result = computeBaadhakas(lagnaSignIndex, planets || [], rawBaadhakas)
+    return res.json(result)
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+/**
+ * Calculate Marakas
+ */
+app.post('/api/analysis/marakas', async (req, res) => {
+  try {
+    const { lagnaSignIndex, planets, rasisMap } = req.body
+    let rawMarakas = null
+    try {
+      rawMarakas = await horaFetch('/v1/marakas', {
+        lagna: lagnaSignIndex,
+        graha_signs: rasisMap || {},
+      })
+    } catch {}
+    const result = computeMarakas(lagnaSignIndex, planets || [], rawMarakas)
+    return res.json(result)
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+/**
+ * Calculate Ashtakavarga (SAV & BAV)
+ */
+app.post('/api/analysis/ashtakavarga', async (req, res) => {
+  try {
+    const { lagnaSignIndex, planets, refSigns } = req.body
+    let rawAv = null
+    try {
+      rawAv = await horaFetch('/v1/ashtakavarga/chart', {
+        reference_signs: refSigns || {},
+      })
+    } catch {}
+    const result = normalizeAshtakavarga(rawAv, lagnaSignIndex, planets || [])
+    return res.json(result)
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+/**
+ * Get Functional Nature for Lagna
+ */
+app.get('/api/analysis/functional/:lagna', async (req, res) => {
+  try {
+    const lagna = parseInt(req.params.lagna, 10) || 0
+    const result = await horaFetch(`/v1/functional/lagna?sign=${lagna}`)
+    return res.json(result)
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+/**
+ * Get Classical Book Charts Catalog
+ */
+app.get('/api/book-charts', async (_req, res) => {
+  try {
+    const result = await horaFetch('/v1/book-charts')
+    return res.json(result)
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+app.get('/api/book-charts/:number', async (req, res) => {
+  try {
+    const result = await horaFetch(`/v1/book-charts/${req.params.number}`)
+    return res.json(result)
+  } catch (err) {
+    return res.status(err.status || 500).json({ error: err.message })
   }
 })
 
 // ---------------------------------------------------------------------------
 // Saved charts: CRUD against SQLite
+// ---------------------------------------------------------------------------
+// Legacy Chart Payload Enricher (Graceful Backward Compatibility)
+// ---------------------------------------------------------------------------
+
+function enrichLegacyPayload(payload) {
+  if (!payload || typeof payload !== 'object') return payload
+  const planets = payload.planets || []
+  const houses = payload.houses || []
+
+  // Ensure planets have precise degrees, DMS, and longitudes
+  for (let i = 0; i < planets.length; i++) {
+    const p = planets[i]
+    const sIdx = p.signIndex !== undefined ? p.signIndex : parseSignIndex(p.sign)
+    p.signIndex = sIdx
+    p.signNumber = sIdx + 1
+
+    if (p.degreeInSign == null || isNaN(p.degreeInSign)) {
+      if (p.degree) {
+        const clean = String(p.degree).trim()
+        const parts = clean.split(/[-:°'"]+/).filter(Boolean).map(Number)
+        if (parts.length >= 1 && !isNaN(parts[0])) {
+          const d = parts[0]
+          const m = parts[1] || 0
+          const s = parts[2] || 0
+          p.degreeInSign = d + m / 60 + s / 3600
+          p.dms = `${d}°${String(m).padStart(2, '0')}'${String(s).padStart(2, '0')}"`
+        } else {
+          p.degreeInSign = 0
+          p.dms = '0°00\'00"'
+        }
+      } else {
+        p.degreeInSign = p.degrees_in_rasi ?? 0
+        p.dms = formatDms(p.degreeInSign)
+      }
+    } else if (typeof p.dms === 'string' && p.dms.includes('-') && !p.dms.includes('°')) {
+      const parts = p.dms.split('-')
+      if (parts.length >= 3) {
+        p.dms = `${parts[0]}°${parts[1].padStart(2, '0')}'${parts[2].padStart(2, '0')}"`
+      }
+    } else if (!p.dms) {
+      p.dms = formatDms(p.degreeInSign)
+    }
+
+    if (p.longitude == null || isNaN(p.longitude)) {
+      p.longitude = sIdx * 30 + p.degreeInSign
+    }
+  }
+
+  // Ensure houses have sign index and ordinal
+  for (let h = 0; h < houses.length; h++) {
+    const house = houses[h]
+    if (house.signIndex === undefined && house.sign) {
+      house.signIndex = parseSignIndex(house.sign)
+    }
+  }
+
+  // Ensure full 16 Shodasavarga charts exist as a dictionary
+  const lagnaSignIndex = houses[0]?.signIndex ?? parseSignIndex(payload.lagna || houses[0]?.sign)
+  const lagnaDms = payload.lagnaDms || houses[0]?.dms || '0°00\'00"'
+
+  if (!payload.vargas || Array.isArray(payload.vargas) || !payload.vargas['D1'] || !payload.vargas['D9']?.grahas) {
+    payload.vargas = buildShodasavargaCharts(payload.shodasavargaRaw || null, lagnaSignIndex, planets, lagnaDms)
+  }
+
+  if (!payload.vargaComparison || payload.vargaComparison.length === 0) {
+    if (payload.vargas?.['D1'] && payload.vargas?.['D9']) {
+      payload.vargaComparison = buildVargaComparison(payload.vargas['D1'], payload.vargas['D9'], planets)
+    }
+  }
+
+  // Ensure purusharthaBalance exists
+  if (!payload.purusharthaBalance && planets.length > 0) {
+    payload.purusharthaBalance = computePurusharthaBalance(planets)
+  }
+
+  // Ensure arudhas exists
+  if (!payload.arudhas && houses.length > 0 && planets.length > 0) {
+    payload.arudhas = computeArudhaPadas(houses, planets)
+  }
+
+  // Ensure baadhakas & marakas exist
+  if ((!payload.baadhakas || !payload.marakas) && houses.length > 0 && planets.length > 0) {
+    if (!payload.baadhakas) payload.baadhakas = computeBaadhakas(lagnaSignIndex, houses, planets)
+    if (!payload.marakas) payload.marakas = computeMarakas(lagnaSignIndex, houses, planets)
+  }
+
+  // Ensure ashtakavarga exists
+  if (!payload.ashtakavarga) {
+    payload.ashtakavarga = normalizeAshtakavarga(payload.rawAshtakavarga || payload.raw?.ashtakavarga, houses, planets)
+  }
+
+  // Ensure dashaTree exists, has valid lords, and has expanded subperiods
+  const rawDashas = payload.dashaTree || payload.dashas || []
+  if (Array.isArray(rawDashas) && rawDashas.length > 0) {
+    const normalizedDashas = rawDashas.map((d) => {
+      const node = normalizeDashaTreeNode(d, 1)
+      if (node && (!node.children || node.children.length === 0)) {
+        node.children = expandDashaSubPeriodsBackend(node, 2)
+      }
+      return node
+    })
+    payload.dashaTree = normalizedDashas
+    payload.dashas = normalizedDashas
+    if (!payload.activeDashaChain || payload.activeDashaChain.length === 0) {
+      payload.activeDashaChain = computeActiveDashaChainBackend(normalizedDashas, new Date(), planets)
+    }
+  }
+
+  return payload
+}
+
+/**
+ * Automatically upgrades existing charts in database that have missing degrees or legacy vargas arrays
+ */
+async function autoUpgradeSavedCharts() {
+  try {
+    const rows = db.prepare('SELECT id, name, birth_data, payload FROM charts').all()
+    for (const row of rows) {
+      if (!row.birth_data) continue
+      let bdata = null
+      let payload = null
+      try { bdata = JSON.parse(row.birth_data) } catch {}
+      try { payload = JSON.parse(row.payload) } catch {}
+
+      const needsUpgrade =
+        !payload ||
+        !payload.planets ||
+        payload.planets[0]?.degreeInSign == null ||
+        Array.isArray(payload.vargas) ||
+        !payload.vargas?.['D9']?.grahas
+
+      if (bdata && bdata.year && needsUpgrade) {
+        try {
+          const fresh = await computeChart(row.name, bdata)
+          db.prepare('UPDATE charts SET payload = ? WHERE id = ?').run(JSON.stringify(fresh), row.id)
+          console.log(`[AutoUpgrade] Chart ${row.id} ("${row.name}") successfully upgraded with live astronomical data and 16 Shodasavargas.`)
+        } catch (e) {
+          console.warn(`[AutoUpgrade] Could not recompute chart ${row.id}:`, e.message)
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[AutoUpgrade] Error:', err.message)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Chart Store Routes
 // ---------------------------------------------------------------------------
 
 app.get('/api/charts', (_req, res) => {
@@ -691,8 +784,9 @@ app.get('/api/charts', (_req, res) => {
       let birthData = null
       try { if (row.payload) payload = JSON.parse(row.payload) } catch {}
       try { if (row.birth_data) birthData = JSON.parse(row.birth_data) } catch {}
+      const enriched = enrichLegacyPayload(payload)
       return {
-        ...payload,
+        ...enriched,
         id: row.id,
         name: row.name,
         birthData: birthData || payload.birthData || null,
@@ -714,8 +808,9 @@ app.get('/api/charts/:id', (req, res) => {
     let birthData = null
     try { if (row.payload) payload = JSON.parse(row.payload) } catch {}
     try { if (row.birth_data) birthData = JSON.parse(row.birth_data) } catch {}
+    const enriched = enrichLegacyPayload(payload)
     return res.json({
-      ...payload,
+      ...enriched,
       id: row.id,
       name: row.name,
       birthData: birthData || payload.birthData || null,
@@ -782,6 +877,5 @@ if (fs.existsSync(frontendDist)) {
 
 app.listen(port, () => {
   console.log(`Kundli Workbench API running on http://localhost:${port}`)
-  console.log(`  → Hora engine at ${HORA_API}`)
-  console.log(`  → SQLite at ${dbPath}`)
+  setTimeout(autoUpgradeSavedCharts, 1000)
 })

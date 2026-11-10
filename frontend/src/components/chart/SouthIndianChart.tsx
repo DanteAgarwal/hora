@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { PlanetBadge } from './PlanetBadge'
-import type { PlanetPosition, VargaGrahaPlacement } from '../../types/astro'
+import type { HousePosition, PlanetPosition, VargaGrahaPlacement } from '../../types/astro'
 import { ZODIAC_SIGNS } from '../../types/astro'
 
 interface SouthIndianChartProps {
@@ -9,6 +9,7 @@ interface SouthIndianChartProps {
   selectedPlanet?: string
   selectedHouse?: number
   showDegrees?: boolean
+  houses?: HousePosition[]
   chartTitle?: string
   ayanamsaText?: string
   onSelectPlanet?: (planetName: string) => void
@@ -45,6 +46,7 @@ export const SouthIndianChart: React.FC<SouthIndianChartProps> = ({
   selectedPlanet,
   selectedHouse,
   showDegrees = true,
+  houses,
   chartTitle = 'Rashi Chart',
   ayanamsaText,
   onSelectPlanet,
@@ -246,6 +248,25 @@ export const SouthIndianChart: React.FC<SouthIndianChartProps> = ({
               >
                 {isLagna ? 'H1 (Asc)' : `H${houseNum}`}
               </text>
+
+              {/* Arudha badges situated in this house */}
+              {(() => {
+                const hObj = houses?.find((h) => h.number === houseNum)
+                if (!hObj?.arudhasHere || hObj.arudhasHere.length === 0) return null
+                return (
+                  <text
+                    x={cell.x + 8}
+                    y={cell.y + 28}
+                    fill="#fbbf24"
+                    fontSize="9"
+                    fontWeight="700"
+                    fontFamily="'JetBrains Mono', monospace"
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    {hObj.arudhasHere.join(' ')}
+                  </text>
+                )
+              })()}
 
               {/* Planets inside this sign */}
               {occupants.map((p, pIdx) => {

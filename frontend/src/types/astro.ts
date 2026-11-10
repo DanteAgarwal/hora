@@ -82,6 +82,24 @@ export interface PlanetPosition {
   }[]
   temporalRelation?: 'Friend' | 'Enemy'
   compoundRelation?: string
+  digbalaScore?: number
+  digbalaPeakHouse?: number
+  digbalaStatus?: string
+  combustionDegrees?: number
+  combustionStatus?: string
+  isNeechaBhanga?: boolean
+  neechaBhangaReason?: string
+  isBaadhaka?: boolean
+  baadhakaReason?: string
+  isMaraka?: boolean
+  marakaKind?: string
+  marakaReasons?: string[]
+  functionalNature?: string
+  isYogakaraka?: boolean
+  functionalWhy?: string
+  bavPoints?: number
+  bavGrade?: 'favorable' | 'neutral' | 'unfavorable'
+  vakri?: VakriPlanetAnalysis | null
 }
 
 export interface HousePosition {
@@ -96,6 +114,7 @@ export interface HousePosition {
   lordHouseOrdinal?: string
   lordSign?: string
   lordDignity?: DignityType
+  lordPlacementInsight?: string
   naturalKaraka?: string
   occupants: string[] // Planet names
   aspectsReceived: {
@@ -110,6 +129,14 @@ export interface HousePosition {
   cuspLongitude?: number
   endLongitude?: number
   categories: string[] // ['kendra', 'dharma', 'tanu bhava']
+  arudhaPada?: string
+  arudhaPadaName?: string
+  arudhasHere?: string[]
+  isBaadhakaSthana?: boolean
+  isMarakaHouse?: boolean
+  savPoints?: number
+  savGrade?: 'strong' | 'average' | 'weak'
+  argalas?: any
 }
 
 export interface VargaGrahaPlacement {
@@ -122,6 +149,9 @@ export interface VargaGrahaPlacement {
   retrograde: boolean
   longitude?: number
   dms?: string
+  dignity?: DignityType
+  dispositor?: string
+  isVargottama?: boolean
 }
 
 export interface VargaChartData {
@@ -210,6 +240,96 @@ export interface SambhandhaResult {
   bphsGuidance: string
 }
 
+export interface AspectDetail {
+  houseDistance: number
+  virupas: number // 0 - 60
+  strengthLabel: string
+  isSpecial: boolean
+  isFull: boolean
+  casterType: 'benefic' | 'malefic'
+  casterFunctional?: string
+  description: string
+}
+
+export interface AspectsMatrixData {
+  bhavaAspects: Record<string, Record<number, AspectDetail | null>>
+  mutualAspects: Record<string, Record<string, {
+    aToB: AspectDetail | null
+    bToA: AspectDetail | null
+    isMutual: boolean
+    isConjunction: boolean
+  } | null>>
+}
+
+export interface PlanetDignityData {
+  planet: PlanetPosition
+  name: string
+  dignity: DignityType
+  isExalted: boolean
+  isMoolatrikona: boolean
+  isOwnSign: boolean
+  isDebilitated: boolean
+  isNeechaBhanga: boolean
+  neechaBhangaReason?: string
+  isRetrograde: boolean
+  isCombust: boolean
+  combustionDegrees?: number
+  combustionStatus: 'Deeply Combust' | 'Combust' | 'Mildly Combust' | 'Safe' | 'Exempt'
+  digbalaScore: number // 0 to 100%
+  digbalaPeakHouse: number
+  digbalaStatus: 'Full Digbala' | 'High Digbala' | 'Moderate' | 'Zero Digbala'
+  dispositor: string
+  dispositorPlanet?: PlanetPosition | null
+}
+
+export interface PurusharthaGroup {
+  name: 'Dharma' | 'Artha' | 'Kama' | 'Moksha'
+  sanskrit: string
+  houses: number[]
+  theme: string
+  color: string
+  bgGradient: string
+  planets: PlanetPosition[]
+  percentage: number
+  count?: number
+}
+
+export interface StanzaGroup {
+  name: string
+  sanskrit: string
+  houses: number[]
+  description: string
+  planets: PlanetPosition[]
+  count: number
+}
+
+export interface PurusharthaBalanceData {
+  purusharthas: PurusharthaGroup[]
+  dominantPurushartha: string
+  dominantTheme: string
+  stanzas: StanzaGroup[]
+}
+
+export interface PlanetComparisonRow {
+  name: string
+  sanskrit: string
+  symbol: string
+  retrograde: boolean
+  combust: boolean
+  d1Sign: string
+  d1SignIndex: number
+  d1House: number
+  d1Dms: string
+  d1Dignity: DignityType
+  d9Sign: string
+  d9SignIndex: number
+  d9House: number
+  d9Dignity: DignityType
+  isVargottama: boolean
+  dignityShift: string
+  shiftTone: 'elevated' | 'reduced' | 'stable' | 'neutral'
+}
+
 export interface AstroChart {
   id: number
   name: string
@@ -219,14 +339,26 @@ export interface AstroChart {
   planets: PlanetPosition[]
   houses: HousePosition[]
   vargas: Record<string, VargaChartData>
+  vargaComparison?: PlanetComparisonRow[]
   dashaTree: DashaPeriod[]
   dashas?: DashaPeriod[]
   runningDasha: string[]
   activeDashaChain?: any[]
+  sambhandhaMatrix?: Record<string, Record<string, SambhandhaResult | null>>
+  aspectsMatrix?: AspectsMatrixData
+  dignityOverview?: PlanetDignityData[]
+  purusharthaBalance?: PurusharthaBalanceData
+  arudhas?: any
+  baadhakas?: any
+  marakas?: any
+  ashtakavarga?: any
+  argalas?: any
+  functional?: any
   panchanga?: PanchangaData
   aspects?: any
   relationships?: any
   yogas?: PlanetaryYoga[]
+  vakriAnalysis?: VakriChartAnalysis | null
   raw?: any
 }
 
@@ -318,3 +450,186 @@ export const OWN_SIGNS: Record<string, number[]> = {
   Ketu: [7],
 }
 
+
+
+// ---------------------------------------------------------------------------
+// Vakri Graha Intelligence Engine Domain Models (Specification v1.0)
+// ---------------------------------------------------------------------------
+
+export interface VakriMotion {
+  motion: 'retrograde' | 'direct' | 'stationary' | 'not_applicable'
+  daily_speed: number
+  is_retrograde: boolean
+  is_stationary: boolean
+  motion_category: string // Vakra, Anuvakra, Vikala, Sama, etc.
+  chesta_virupas: number
+  tolerance: number
+  is_node: boolean
+  node_convention?: string | null
+}
+
+export interface VakriDignity {
+  actual: string // strictly astronomical sign dignity
+  is_exalted: boolean
+  is_debilitated: boolean
+  is_own_sign: boolean
+  retrograde_classical_effect?: string | null // e.g. 'exaltation_like_results'
+  interpretive_source?: string | null
+  explanation?: string | null
+}
+
+export interface VakriChestaBala {
+  motion_category: string
+  traditional_chesta_value: number
+  chesta_rupas: number
+  source: string
+  status: string
+  details: string
+}
+
+export interface VakriShadbala {
+  sthana_bala_virupas: number
+  dig_bala_virupas: number
+  kala_bala_virupas: number
+  chesta_bala_virupas: number
+  naisargika_bala_virupas: number
+  drik_bala_virupas: number
+  total_shadbala_virupas: number
+  total_shadbala_rupas: number
+  required_shadbala_virupas: number
+  required_shadbala_rupas: number
+  strength_ratio: number
+  strength_status: 'meets_reference_threshold' | 'below_reference_threshold'
+  reference_standard: string
+  units: string
+}
+
+export interface VakriHouseAnalysis {
+  occupied_house: number
+  owned_houses: number[]
+  lordship_classes: string[]
+  functional_nature: string
+  dispositor: string
+  dispositor_sign: string
+  dispositor_house: number
+  dispositor_dignity: string
+  functional_explanation: string
+  house_offset_influence?: {
+    planet: string
+    offset_count: number
+    target_house: number
+    source: string
+    confidence: string
+    description: string
+  } | null
+}
+
+export interface VakriVargaAnalysis {
+  D1_sign: string
+  D1_dignity: string
+  D1_house: number
+  D9_sign: string
+  D9_dignity: string
+  D9_house: number
+  D10_sign: string
+  D10_dignity: string
+  D10_house: number
+  is_vargottama: boolean
+  natal_retrograde_accompanies_varga: boolean
+  varga_interpretation: string
+}
+
+export interface VakriDashaAnalysis {
+  is_active_mahadasha: boolean
+  is_active_antardasha: boolean
+  active_dasha_level?: number | null
+  classical_dasha_effect: string
+  source_reference: string
+  edition_specific_reversal_caveat?: string | null
+}
+
+export interface VakriClassicalRule {
+  rule_id: string
+  rule_name: string
+  category: string
+  text_title: string
+  chapter_verse: string
+  sanskrit: string
+  iast: string
+  translation: string
+  effect: string
+  confidence: 'A' | 'B' | 'C' | 'D' | 'U'
+  witness: string
+}
+
+export interface VakriConflict {
+  conflict_id: string
+  topic: string
+  explanation: string
+  resolution: string
+  diverging_rules: {
+    source: string
+    interpretation: string
+    status: string
+  }[]
+}
+
+export interface VakriInterpretation {
+  summary: string
+  astronomical_factor: string
+  motional_strength_factor: string
+  dignity_factor: string
+  house_lordship_factor: string
+  functional_impact_factor: string
+  timing_factor: string
+  certainty: string
+}
+
+export interface VakriSource {
+  text: string
+  author: string
+  chapter: string
+  verse: string
+  witness: string
+  confidence: string
+}
+
+export interface VakriPlanetAnalysis {
+  status?: string
+  planet: string
+  retrograde: boolean
+  is_stationary: boolean
+  is_node: boolean
+  motion: VakriMotion
+  dignity: VakriDignity
+  chesta_bala?: VakriChestaBala | null
+  shadbala?: VakriShadbala | null
+  house_analysis: VakriHouseAnalysis
+  aspects_conjunctions: {
+    conjunctions: string[]
+    benefic_aspects_received: any[]
+    malefic_aspects_received: any[]
+    special_aspects_cast: any[]
+    is_combust: boolean
+    combustion_orb: number
+    angular_separation_from_sun: number
+    planetary_war?: any | null
+  }
+  varga_analysis: VakriVargaAnalysis
+  dasha_analysis: VakriDashaAnalysis
+  classical_rules: VakriClassicalRule[]
+  textual_conflicts: VakriConflict[]
+  interpretation: VakriInterpretation
+  sources: VakriSource[]
+}
+
+export interface VakriChartAnalysis {
+  status?: string
+  chart_id?: string | null
+  calculation_settings: Record<string, any>
+  analysis_settings: Record<string, any>
+  retrograde_count: number
+  retrograde_planets: string[]
+  planets: Record<string, VakriPlanetAnalysis>
+  chart_level_synthesis: string
+}

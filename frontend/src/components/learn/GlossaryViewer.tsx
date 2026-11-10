@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import type { AstroChart } from '../../types/astro'
-import { GLOSSARY_TERMS, type GlossaryTerm, type GlossaryCategory } from './glossaryData'
+import { GLOSSARY_TERMS, type GlossaryCategory } from './glossaryData'
 
 interface GlossaryViewerProps {
   chart: AstroChart

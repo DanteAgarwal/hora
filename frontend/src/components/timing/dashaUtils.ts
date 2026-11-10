@@ -13,6 +13,10 @@ export interface DashaChainItem {
   levelLabel: string
   lord: string
   period?: DashaPeriod
+  isRetrograde?: boolean
+  dignity?: string
+  chestaBalaVirupas?: number
+  classicalDashaNote?: string
 }
 
 export const PLANET_COLORS: Record<string, string> = {
@@ -66,53 +70,26 @@ export const LEVEL_METADATA: Record<number, { name: string; short: string; spanD
   },
 }
 
-// Classical Parashari Naisargika (Natural) Maitri Table
-export const NATURAL_FRIENDSHIP: Record<string, { friends: string[]; enemies: string[]; neutrals: string[] }> = {
-  Sun: {
-    friends: ['Moon', 'Mars', 'Jupiter'],
-    enemies: ['Venus', 'Saturn'],
-    neutrals: ['Mercury'],
-  },
-  Moon: {
-    friends: ['Sun', 'Mercury'],
-    enemies: [],
-    neutrals: ['Mars', 'Jupiter', 'Venus', 'Saturn'],
-  },
-  Mars: {
-    friends: ['Sun', 'Moon', 'Jupiter'],
-    enemies: ['Mercury'],
-    neutrals: ['Venus', 'Saturn'],
-  },
-  Mercury: {
-    friends: ['Sun', 'Venus'],
-    enemies: ['Moon'],
-    neutrals: ['Mars', 'Jupiter', 'Saturn'],
-  },
-  Jupiter: {
-    friends: ['Sun', 'Moon', 'Mars'],
-    enemies: ['Mercury', 'Venus'],
-    neutrals: ['Saturn'],
-  },
-  Venus: {
-    friends: ['Mercury', 'Saturn'],
-    enemies: ['Sun', 'Moon'],
-    neutrals: ['Mars', 'Jupiter'],
-  },
-  Saturn: {
-    friends: ['Mercury', 'Venus'],
-    enemies: ['Sun', 'Moon', 'Mars'],
-    neutrals: ['Jupiter'],
-  },
-  Rahu: {
-    friends: ['Venus', 'Saturn', 'Mercury'],
-    enemies: ['Sun', 'Moon', 'Mars'],
-    neutrals: ['Jupiter'],
-  },
-  Ketu: {
-    friends: ['Mars', 'Venus', 'Saturn'],
-    enemies: ['Sun', 'Moon'],
-    neutrals: ['Mercury', 'Jupiter'],
-  },
+/**
+ * Safely parses any date input (ISO string, YYYY-MM-DD, timestamp) into UTC milliseconds.
+ * Prevents browser-local timezone offset shifts from drifting timestamps across deeper dasha levels.
+ */
+export function parseDateMs(dateInput: string | number | Date | undefined | null): number {
+  if (!dateInput) return NaN
+  if (typeof dateInput === 'number') return dateInput
+  if (dateInput instanceof Date) return dateInput.getTime()
+  const str = String(dateInput).trim()
+  if (!str) return NaN
+
+  // If already standard ISO with 'Z' or explicit timezone offset
+  if (str.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(str)) {
+    return new Date(str).getTime()
+  }
+
+  // Treat 'YYYY-MM-DD HH:mm:ss' or 'YYYY-MM-DD' as UTC
+  const iso = str.replace(' ', 'T') + (str.length > 10 ? 'Z' : 'T00:00:00Z')
+  const parsed = new Date(iso).getTime()
+  return isNaN(parsed) ? new Date(str).getTime() : parsed
 }
 
 export type CompoundFriendship = 'Adhi-Mitra' | 'Mitra' | 'Sama' | 'Shatru' | 'Adhi-Shatru'
@@ -130,111 +107,41 @@ export interface SambhandhaResult {
 }
 
 /**
- * Calculates classical Vedic Sambhandha (relationship & mutual placement)
- * between two Grahas in a birth chart (e.g. Mahadasha Lord & Antardasha Lord).
+ * Retrieves classical Vedic Sambhandha between two Grahas.
+ * Computed directly by the backend engine (or cached in chart.sambhandhaMatrix).
  */
 export function calculateSambhandha(
   lordA: string,
   lordB: string,
   chart: AstroChart
 ): SambhandhaResult | null {
-  if (!lordA || !lordB) return null
+  if (!lordA || !lordB || !chart || !Array.isArray(chart.planets)) return null
+  if (chart.sambhandhaMatrix && chart.sambhandhaMatrix[lordA] && chart.sambhandhaMatrix[lordA][lordB]) {
+    return chart.sambhandhaMatrix[lordA][lordB]
+  }
+
+  // Fallback: axis derivation
   const cleanA = lordA.trim().toLowerCase()
   const cleanB = lordB.trim().toLowerCase()
-
-  const pA = chart.planets.find((p) => p.name.toLowerCase() === cleanA)
-  const pB = chart.planets.find((p) => p.name.toLowerCase() === cleanB)
-
+  const pA = chart.planets.find((p) => (p.name || '').toLowerCase() === cleanA)
+  const pB = chart.planets.find((p) => (p.name || '').toLowerCase() === cleanB)
   if (!pA || !pB) return null
 
   const houseA = pA.houseNumber || 1
   const houseB = pB.houseNumber || 1
-
-  // Distance from A to B: 1-indexed
   const distFromAtoB = ((houseB - houseA + 12) % 12) + 1
   const distFromBtoA = ((houseA - houseB + 12) % 12) + 1
-
-  // Axis determination
-  let axisLabel = `${distFromAtoB}/${distFromBtoA}`
-  let category: SambhandhaResult['category'] = 'Dynamic Action'
-  let synthesis = ''
-  let bphsGuidance = ''
-
-  if (distFromAtoB === 1) {
-    axisLabel = '1/1 (Yuti / Conjunction)'
-    category = 'Conjunction'
-    synthesis = `Intense energy fusion in the ${pA.houseOrdinal} House (${pA.sign}). The portfolios of both ${pA.name} and ${pB.name} manifest simultaneously.`
-    bphsGuidance = 'Combined results of both planets manifest directly in the occupied bhava. Auspicious if both are natural benefics or functional friends; requires remedies if afflicted.'
-  } else if (distFromAtoB === 7) {
-    axisLabel = '1/7 (Samasaptaka / Direct Aspect)'
-    category = 'Mutual Aspect'
-    synthesis = `Direct polar mutual aspect across the ${pA.houseOrdinal} and ${pB.houseOrdinal} houses. Creates dynamic awareness, interpersonal developments, and external encounters.`
-    bphsGuidance = 'Mutual activation of opposite houses. Promotes public visibility, relationship negotiations, and balancing opposing life polarities.'
-  } else if (distFromAtoB === 5 || distFromAtoB === 9) {
-    axisLabel = '5/9 (Nava-Panchama / Trikona)'
-    category = 'Auspicious'
-    synthesis = `Harmonious 5/9 Trikona axis (Lakshmi Sthana). The lords support each other naturally, bestowing divine grace, intelligence, and fortune.`
-    bphsGuidance = 'Classical Brihat Parashara Hora Shastra confirms high auspiciousness. Favorable for wealth accrual, spiritual advancement, higher education, and joy from progeny.'
-  } else if (distFromAtoB === 3 || distFromAtoB === 11) {
-    axisLabel = '3/11 (Trishad-Aya / Upachaya)'
-    category = 'Favorable Growth'
-    synthesis = `Favorable 3/11 growth axis (Upachaya). Facilitates networking, enterprise, courage, friendship, and steady realization of long-held desires.`
-    bphsGuidance = 'Progressive improvement over time. The sub-period rewards strategic initiative, commercial enterprise, and assistance from elder siblings or mentors.'
-  } else if (distFromAtoB === 4 || distFromAtoB === 10) {
-    axisLabel = '4/10 (Kendra / Quadrant)'
-    category = 'Dynamic Action'
-    synthesis = `Dynamic 4/10 angular alignment (Vishnu Sthana). Stimulates active public karma, career responsibilities, domestic changes, and worldly standing.`
-    bphsGuidance = 'Period of visible work and decisive worldly action. Balanced effort between domestic foundations (4th) and professional leadership (10th) brings elevation.'
-  } else if (distFromAtoB === 6 || distFromAtoB === 8) {
-    axisLabel = '6/8 (Shadashtaka / Friction)'
-    category = 'Challenging Friction'
-    synthesis = `Challenging 6/8 Shadashtak axis. Brings sudden transformations, latent vulnerabilities to the surface, and tests stamina through opposition or disputes.`
-    bphsGuidance = 'Classical texts advise prudence, health vigilance, and avoiding unnecessary conflicts or speculative gambles. Remedial propitiation strongly recommended.'
-  } else if (distFromAtoB === 2 || distFromAtoB === 12) {
-    axisLabel = '2/12 (Dwirdwadasa / Expenditure)'
-    category = 'Expenditure & Shift'
-    synthesis = `2/12 Dwirdwadasa axis. Points toward reallocation of resources, major financial investments, foreign travels, or inward spiritual introspection.`
-    bphsGuidance = 'Funds and energy are directed toward expenses, relocations, or charitable/spiritual avenues. Focus on conserving resources and avoiding impulsive outlays.'
-  }
-
-  // Natural Friendship (Naisargika)
-  const normA = pA.name in NATURAL_FRIENDSHIP ? pA.name : 'Sun'
-  const naturalObj = NATURAL_FRIENDSHIP[normA] || { friends: [], enemies: [], neutrals: [] }
-  let natScore = 0
-  let naturalMaitri: SambhandhaResult['naturalMaitri'] = 'Neutral'
-  if (naturalObj.friends.some((f) => f.toLowerCase() === cleanB)) {
-    natScore = 1
-    naturalMaitri = 'Friend'
-  } else if (naturalObj.enemies.some((e) => e.toLowerCase() === cleanB)) {
-    natScore = -1
-    naturalMaitri = 'Enemy'
-  }
-
-  // Temporal Friendship (Tatkalika)
-  // Planets in 2, 3, 4, 10, 11, 12 from each other are temporal friends (+1); others are enemies (-1)
-  const isTemporalFriend = [2, 3, 4, 10, 11, 12].includes(distFromAtoB)
-  const tempScore = isTemporalFriend ? 1 : -1
-  const temporalMaitri: SambhandhaResult['temporalMaitri'] = isTemporalFriend ? 'Friend' : 'Enemy'
-
-  // Compound 5-Fold Maitri (Panchadha)
-  const totalScore = natScore + tempScore
-  let compoundMaitri: CompoundFriendship = 'Sama'
-  if (totalScore === 2) compoundMaitri = 'Adhi-Mitra'
-  else if (totalScore === 1) compoundMaitri = 'Mitra'
-  else if (totalScore === 0) compoundMaitri = 'Sama'
-  else if (totalScore === -1) compoundMaitri = 'Shatru'
-  else if (totalScore === -2) compoundMaitri = 'Adhi-Shatru'
 
   return {
     distFromAtoB,
     distFromBtoA,
-    axisLabel,
-    category,
-    naturalMaitri,
-    temporalMaitri,
-    compoundMaitri,
-    synthesis,
-    bphsGuidance,
+    axisLabel: `${distFromAtoB}/${distFromBtoA}`,
+    category: distFromAtoB === 1 ? 'Conjunction' : distFromAtoB === 7 ? 'Mutual Aspect' : [5, 9].includes(distFromAtoB) ? 'Auspicious' : [3, 11].includes(distFromAtoB) ? 'Favorable Growth' : [6, 8].includes(distFromAtoB) ? 'Challenging Friction' : 'Dynamic Action',
+    naturalMaitri: 'Neutral',
+    temporalMaitri: [2, 3, 4, 10, 11, 12].includes(distFromAtoB) ? 'Friend' : 'Enemy',
+    compoundMaitri: 'Sama',
+    synthesis: `Axis alignment between ${pA.name} and ${pB.name}.`,
+    bphsGuidance: 'Computed by backend engine.',
   }
 }
 
@@ -255,6 +162,26 @@ export function findRunningDashaHierarchy(
   dd: DashaPeriod | null
   chain: DashaChainItem[]
 } {
+  const safeTree = Array.isArray(dashaTree) ? dashaTree : []
+
+  const findIn = (list?: DashaPeriod[] | null): DashaPeriod | null => {
+    if (!list || !Array.isArray(list) || list.length === 0) return null
+    return (
+      list.find((p) => {
+        const start = parseDateMs(p.start)
+        const end = parseDateMs(p.end)
+
+        return (
+          Number.isFinite(start) &&
+          Number.isFinite(end) &&
+          start <= targetMs &&
+          targetMs < end
+        )
+      }) ?? null
+    )
+  }
+
+  // If backend provided an active chain, prefer it but ensure valid period object references
   if (activeChainFromBackend && Array.isArray(activeChainFromBackend) && activeChainFromBackend.length > 0) {
     const mdItem = activeChainFromBackend.find((c) => c.level === 1)
     const adItem = activeChainFromBackend.find((c) => c.level === 2)
@@ -262,39 +189,59 @@ export function findRunningDashaHierarchy(
     const sdItem = activeChainFromBackend.find((c) => c.level === 4)
     const prdItem = activeChainFromBackend.find((c) => c.level === 5)
     const ddItem = activeChainFromBackend.find((c) => c.level === 6)
+
+    // Match period nodes in dashaTree if period object is omitted in activeChain items
+    const md =
+      mdItem?.period ||
+      safeTree.find((p) => mdItem?.lord && p.lord.toLowerCase() === mdItem.lord.toLowerCase()) ||
+      findIn(safeTree) ||
+      safeTree[0] ||
+      null
+
+    const ad =
+      adItem?.period ||
+      (md?.children?.find((c) => adItem?.lord && c.lord.toLowerCase() === adItem.lord.toLowerCase()) ?? null) ||
+      findIn(md?.children) ||
+      (md?.children?.[0] ?? null)
+
+    const pd =
+      pdItem?.period ||
+      (ad?.children?.find((c) => pdItem?.lord && c.lord.toLowerCase() === pdItem.lord.toLowerCase()) ?? null) ||
+      findIn(ad?.children) ||
+      (ad?.children?.[0] ?? null)
+
+    const sd = sdItem?.period || findIn(pd?.children) || null
+    const prd = prdItem?.period || findIn(sd?.children) || null
+    const dd = ddItem?.period || findIn(prd?.children) || null
+
+    const resolvedChain: DashaChainItem[] = []
+    if (md) resolvedChain.push({ level: 1, levelLabel: 'MD', lord: md.lord, period: md })
+    if (ad) resolvedChain.push({ level: 2, levelLabel: 'AD', lord: ad.lord, period: ad })
+    if (pd) resolvedChain.push({ level: 3, levelLabel: 'PD', lord: pd.lord, period: pd })
+    if (sd) resolvedChain.push({ level: 4, levelLabel: 'SD', lord: sd.lord, period: sd })
+    if (prd) resolvedChain.push({ level: 5, levelLabel: 'PrD', lord: prd.lord, period: prd })
+    if (dd) resolvedChain.push({ level: 6, levelLabel: 'DD', lord: dd.lord, period: dd })
+
     return {
-      md: mdItem?.period || null,
-      ad: adItem?.period || null,
-      pd: pdItem?.period || null,
-      sd: sdItem?.period || null,
-      prd: prdItem?.period || null,
-      dd: ddItem?.period || null,
-      chain: activeChainFromBackend,
+      md,
+      ad,
+      pd,
+      sd,
+      prd,
+      dd,
+      chain: resolvedChain.length > 0 ? resolvedChain : activeChainFromBackend,
     }
   }
 
-  const findIn = (list: DashaPeriod[]): DashaPeriod | null => {
-    return list.find((p) => {
-      const start = new Date(p.start).getTime()
-      const end = new Date(p.end).getTime()
-
-      return (
-        Number.isFinite(start) &&
-        Number.isFinite(end) &&
-        start <= targetMs &&
-        targetMs < end
-      )
-    }) ?? null
-  }
-
-  const md = findIn(dashaTree)
+  const rawMd = findIn(safeTree)
+  const md = rawMd || safeTree[0] || null
   if (!md) return { md: null, ad: null, pd: null, sd: null, prd: null, dd: null, chain: [] }
 
-  const ad = md.children && md.children.length > 0 ? findIn(md.children) : null
-  const pd = ad && ad.children && ad.children.length > 0 ? findIn(ad.children) : null
-  const sd = pd && pd.children && pd.children.length > 0 ? findIn(pd.children) : null
-  const prd = sd && sd.children && sd.children.length > 0 ? findIn(sd.children) : null
-  const dd = prd && prd.children && prd.children.length > 0 ? findIn(prd.children) : null
+  const ad = findIn(md.children) || (md.children?.[0] ?? null)
+  const pd = ad ? findIn(ad.children) || (ad.children?.[0] ?? null) : null
+  const sd = pd ? findIn(pd.children) : null
+  const prd = sd ? findIn(sd.children) : null
+  const dd = prd ? findIn(prd.children) : null
 
   const chain: DashaChainItem[] = [
     { level: 1, levelLabel: 'MD', lord: md.lord, period: md },
@@ -318,8 +265,8 @@ export function checkDashaSandhi(period: DashaPeriod, targetMs: number = Date.no
   remainingFormatted: string
   message: string
 } {
-  const startMs = new Date(period.start).getTime()
-  const endMs = new Date(period.end).getTime()
+  const startMs = parseDateMs(period.start)
+  const endMs = parseDateMs(period.end)
   if (isNaN(startMs) || isNaN(endMs) || endMs <= startMs) {
     return { isSandhi: false, remainingDays: 0, remainingFormatted: '—', message: '' }
   }
@@ -356,9 +303,13 @@ export function getActivatedHouses(lords: string[], chart: AstroChart): {
 } {
   const houseSet = new Set<number>()
   const details: { lord: string; occupiedHouse: number; ruledHouses: number[] }[] = []
+  if (!chart || !Array.isArray(chart.planets) || !Array.isArray(lords)) {
+    return { houseNumbers: [1, 5, 9], details: [] }
+  }
 
   lords.forEach((lordName) => {
-    const p = chart.planets.find((pl) => pl.name.toLowerCase() === lordName.toLowerCase())
+    if (!lordName || typeof lordName !== 'string') return
+    const p = chart.planets.find((pl) => (pl.name || '').toLowerCase() === lordName.toLowerCase())
     if (!p) return
     if (p.houseNumber) houseSet.add(p.houseNumber)
     if (p.lordOfHouses) {
@@ -541,7 +492,7 @@ export function getMahadashaProfile(lord: string): MahadashaKarmicProfile | null
  * Avoids duplicate keys when the same planet lord repeats at different times or levels.
  */
 export function getPeriodKey(period: DashaPeriod, index?: number): string {
-  const startMs = new Date(period.start).getTime()
+  const startMs = parseDateMs(period.start)
   const timeKey = !isNaN(startMs) ? startMs : period.start || index || 0
   const levelKey = period.level || 1
   return `dasha-${levelKey}-${period.lord}-${timeKey}`
@@ -561,8 +512,8 @@ export function isSamePeriod(
   if ((a.level || 1) !== (b.level || 1)) return false
   if (a.lord.trim().toLowerCase() !== b.lord.trim().toLowerCase()) return false
 
-  const aStart = new Date(a.start).getTime()
-  const bStart = new Date(b.start).getTime()
+  const aStart = parseDateMs(a.start)
+  const bStart = parseDateMs(b.start)
   if (!isNaN(aStart) && !isNaN(bStart)) {
     // Within 2 seconds (covers slight ISO vs UTC rounding discrepancies)
     if (Math.abs(aStart - bStart) < 2000) return true

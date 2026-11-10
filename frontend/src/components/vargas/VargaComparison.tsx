@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react'
-import type { AstroChart, ChartStyle, DignityType } from '../../types/astro'
-import { ZODIAC_SIGNS, EXALTATION_SIGNS, DEBILITATION_SIGNS, OWN_SIGNS } from '../../types/astro'
+import type { AstroChart, ChartStyle, PlanetComparisonRow } from '../../types/astro'
 import { VedicChart } from '../chart/VedicChart'
 
 interface VargaComparisonProps {
@@ -9,26 +8,6 @@ interface VargaComparisonProps {
   selectedHouse?: number
   onSelectPlanet?: (planetName: string) => void
   onSelectHouse?: (houseNumber: number) => void
-}
-
-interface PlanetComparisonRow {
-  name: string
-  sanskrit: string
-  symbol: string
-  retrograde: boolean
-  combust: boolean
-  d1Sign: string
-  d1SignIndex: number
-  d1House: number
-  d1Dms: string
-  d1Dignity: DignityType
-  d9Sign: string
-  d9SignIndex: number
-  d9House: number
-  d9Dignity: DignityType
-  isVargottama: boolean
-  dignityShift: string
-  shiftTone: 'elevated' | 'reduced' | 'stable' | 'neutral'
 }
 
 export const VargaComparison: React.FC<VargaComparisonProps> = ({
@@ -49,72 +28,13 @@ export const VargaComparison: React.FC<VargaComparisonProps> = ({
     return d1.lagnaSignIndex === d9.lagnaSignIndex
   }, [d1, d9])
 
+  // Varga comparison rows pre-computed by backend engine
   const comparisonRows = useMemo<PlanetComparisonRow[]>(() => {
-    if (!d9) return []
-
-    return chart.planets.map((p) => {
-      const d9Placement = d9.grahas.find((g) => g.name === p.name)
-      const d9SignIndex = d9Placement ? d9Placement.signIndex : p.signIndex
-      const d9Sign = ZODIAC_SIGNS[d9SignIndex]?.name || 'Unknown'
-      const d9House = d9Placement ? d9Placement.houseNumber : p.houseNumber
-
-      const isVargottama = p.signIndex === d9SignIndex
-
-      // Derive D9 Dignity
-      let d9Dignity: DignityType = 'Calculated'
-      if (EXALTATION_SIGNS[p.name] === d9SignIndex) d9Dignity = 'Exalted'
-      else if (DEBILITATION_SIGNS[p.name] === d9SignIndex) d9Dignity = 'Debilitated'
-      else if (OWN_SIGNS[p.name]?.includes(d9SignIndex)) d9Dignity = 'Own Sign'
-      else d9Dignity = 'Neutral'
-
-      // Evaluate Shift
-      let dignityShift = 'Consistent'
-      let shiftTone: 'elevated' | 'reduced' | 'stable' | 'neutral' = 'neutral'
-
-      if (p.dignity === 'Debilitated' && (d9Dignity === 'Exalted' || d9Dignity === 'Own Sign')) {
-        dignityShift = 'Neecha Bhanga (Dharmic Elevation: Outer struggle transforms into deep inner wisdom)'
-        shiftTone = 'elevated'
-      } else if (p.dignity === 'Exalted' && d9Dignity === 'Debilitated') {
-        dignityShift = 'Hollow Exaltation (Promising start but lacks enduring spiritual stability)'
-        shiftTone = 'reduced'
-      } else if (p.dignity === 'Exalted' && d9Dignity === 'Exalted') {
-        dignityShift = 'Param Vargottama (Supreme exaltation across body and soul)'
-        shiftTone = 'elevated'
-      } else if (isVargottama) {
-        dignityShift = 'Vargottama Root (Inner and outer nature completely aligned)'
-        shiftTone = 'stable'
-      } else if (d9Dignity === 'Exalted') {
-        dignityShift = 'Inner Elevation (Gains spiritual strength in Navamsha)'
-        shiftTone = 'elevated'
-      } else if (d9Dignity === 'Debilitated') {
-        dignityShift = 'Inner Friction (Challenges in dharmic application)'
-        shiftTone = 'reduced'
-      } else if (d9Dignity === 'Own Sign') {
-        dignityShift = 'Sthira Grounding (Own sign in Navamsha confers inner confidence)'
-        shiftTone = 'stable'
-      }
-
-      return {
-        name: p.name,
-        sanskrit: p.sanskritName,
-        symbol: p.symbol,
-        retrograde: p.retrograde,
-        combust: p.combust,
-        d1Sign: p.sign,
-        d1SignIndex: p.signIndex,
-        d1House: p.houseNumber,
-        d1Dms: p.dms,
-        d1Dignity: p.dignity,
-        d9Sign,
-        d9SignIndex,
-        d9House,
-        d9Dignity,
-        isVargottama,
-        dignityShift,
-        shiftTone,
-      }
-    })
-  }, [chart, d9])
+    if (chart.vargaComparison && chart.vargaComparison.length > 0) {
+      return chart.vargaComparison
+    }
+    return []
+  }, [chart.vargaComparison])
 
   const vargottamaPlanets = useMemo(() => {
     return comparisonRows.filter((r) => r.isVargottama)

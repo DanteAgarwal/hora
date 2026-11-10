@@ -1,53 +1,10 @@
 import React, { useState, useMemo } from 'react'
-import type { AstroChart, PlanetPosition, DignityType } from '../../types/astro'
+import type { AstroChart, PlanetPosition, PlanetDignityData } from '../../types/astro'
 
 interface DignityStrengthOverviewProps {
   chart: AstroChart
   onSelectPlanet?: (planetName: string) => void
   onSelectHouse?: (houseNumber: number) => void
-}
-
-interface PlanetDignityData {
-  planet: PlanetPosition
-  dignity: DignityType
-  isExalted: boolean
-  isMoolatrikona: boolean
-  isOwnSign: boolean
-  isDebilitated: boolean
-  isNeechaBhanga: boolean
-  neechaBhangaReason?: string
-  isRetrograde: boolean
-  isCombust: boolean
-  combustionDegrees?: number
-  combustionStatus: 'Deeply Combust' | 'Combust' | 'Mildly Combust' | 'Safe' | 'Exempt'
-  digbalaScore: number // 0 to 100%
-  digbalaPeakHouse: number
-  digbalaStatus: 'Full Digbala' | 'High Digbala' | 'Moderate' | 'Zero Digbala'
-  dispositor: string
-  dispositorPlanet?: PlanetPosition
-}
-
-// Classical Digbala peak houses
-const DIGBALA_PEAK: Record<string, number> = {
-  Sun: 10,
-  Mars: 10,
-  Jupiter: 1,
-  Mercury: 1,
-  Moon: 4,
-  Venus: 4,
-  Saturn: 7,
-  Rahu: 10,
-  Ketu: 4,
-}
-
-// Classical Combustion orbs from Sun
-const COMBUSTION_ORBS: Record<string, number> = {
-  Moon: 12,
-  Mars: 17,
-  Mercury: 14, // 12 if retrograde
-  Jupiter: 11,
-  Venus: 10, // 8 if retrograde
-  Saturn: 15,
 }
 
 export const DignityStrengthOverview: React.FC<DignityStrengthOverviewProps> = ({
@@ -64,98 +21,32 @@ export const DignityStrengthOverview: React.FC<DignityStrengthOverviewProps> = (
     return map
   }, [chart.planets])
 
-  const sun = planetsMap.get('Sun')
-  const moon = planetsMap.get('Moon')
-
-  // Detailed analysis of each planet
+  // Dignity and strength metrics pre-computed by backend engine
   const enrichedPlanets: PlanetDignityData[] = useMemo(() => {
-    return chart.planets.map((planet) => {
-      const isExalted = planet.dignity === 'Exalted'
-      const isMoolatrikona = planet.dignity === 'Moolatrikona'
-      const isOwnSign = planet.dignity === 'Own Sign'
-      const isDebilitated = planet.dignity === 'Debilitated'
-
-      // Check for Neecha Bhanga (Cancellation of Debilitation)
-      let isNeechaBhanga = false
-      let neechaBhangaReason = ''
-
-      if (isDebilitated) {
-        // Rule 1: Dispositor is in a Kendra from Lagna or Moon
-        const dispositor = planetsMap.get(planet.dispositor)
-        if (dispositor && [1, 4, 7, 10].includes(dispositor.houseNumber)) {
-          isNeechaBhanga = true
-          neechaBhangaReason = `Dispositor ${dispositor.name} occupies Kendra (H${dispositor.houseNumber}) from Lagna.`
-        } else if (dispositor && moon) {
-          const diffFromMoon = ((dispositor.houseNumber - moon.houseNumber + 12) % 12) + 1
-          if ([1, 4, 7, 10].includes(diffFromMoon)) {
-            isNeechaBhanga = true
-            neechaBhangaReason = `Dispositor ${dispositor.name} occupies Kendra (H${diffFromMoon}) from Moon.`
-          }
-        }
-
-        // Rule 2: Planet is in Kendra from Lagna or Moon
-        if (!isNeechaBhanga && [1, 4, 7, 10].includes(planet.houseNumber)) {
-          isNeechaBhanga = true
-          neechaBhangaReason = `Planet itself is in a Kendra (H${planet.houseNumber}), providing institutional strength.`
-        }
-      }
-
-      // Combustion analysis
-      let combustionDegrees: number | undefined
-      let combustionStatus: PlanetDignityData['combustionStatus'] = 'Exempt'
-
-      if (!['Sun', 'Rahu', 'Ketu', 'Lagna'].includes(planet.name) && sun) {
-        let diff = Math.abs(planet.longitude - sun.longitude)
-        if (diff > 180) diff = 360 - diff
-        combustionDegrees = diff
-
-        const maxOrb = COMBUSTION_ORBS[planet.name] || 12
-        if (diff < 3.5) {
-          combustionStatus = 'Deeply Combust'
-        } else if (diff < maxOrb * 0.65) {
-          combustionStatus = 'Combust'
-        } else if (diff < maxOrb) {
-          combustionStatus = 'Mildly Combust'
-        } else {
-          combustionStatus = 'Safe'
-        }
-      }
-
-      // Digbala (Directional Strength)
-      const peakHouse = DIGBALA_PEAK[planet.name] || 1
-      const distFromPeak = Math.min(
-        Math.abs(planet.houseNumber - peakHouse),
-        12 - Math.abs(planet.houseNumber - peakHouse)
-      ) // 0 to 6
-      // 0 diff = 100%, 6 diff (opposite) = 0%
-      const digbalaScore = Math.round(((6 - distFromPeak) / 6) * 100)
-
-      let digbalaStatus: PlanetDignityData['digbalaStatus'] = 'Moderate'
-      if (distFromPeak === 0) digbalaStatus = 'Full Digbala'
-      else if (distFromPeak === 1) digbalaStatus = 'High Digbala'
-      else if (distFromPeak === 6) digbalaStatus = 'Zero Digbala'
-
-      return {
-        planet,
-        dignity: planet.dignity,
-        isExalted,
-        isMoolatrikona,
-        isOwnSign,
-        isDebilitated,
-        isNeechaBhanga,
-        neechaBhangaReason,
-        isRetrograde: planet.retrograde,
-        isCombust: combustionStatus === 'Deeply Combust' || combustionStatus === 'Combust',
-        combustionDegrees,
-        combustionStatus,
-        digbalaScore,
-        digbalaPeakHouse: peakHouse,
-        digbalaStatus,
-        dispositor: planet.dispositor,
-        dispositorPlanet: planetsMap.get(planet.dispositor),
-      }
-    })
-  }, [chart.planets, planetsMap, sun, moon])
+    if (chart.dignityOverview && chart.dignityOverview.length > 0) {
+      return chart.dignityOverview
+    }
+    return chart.planets.map((planet) => ({
+      planet,
+      name: planet.name,
+      dignity: planet.dignity,
+      isExalted: planet.dignity === 'Exalted',
+      isMoolatrikona: planet.dignity === 'Moolatrikona',
+      isOwnSign: planet.dignity === 'Own Sign',
+      isDebilitated: planet.dignity === 'Debilitated',
+      isNeechaBhanga: Boolean(planet.isNeechaBhanga),
+      neechaBhangaReason: planet.neechaBhangaReason || '',
+      isRetrograde: Boolean(planet.retrograde),
+      isCombust: Boolean(planet.combust),
+      combustionDegrees: planet.combustionDegrees,
+      combustionStatus: (planet.combustionStatus as any) || 'Safe',
+      digbalaScore: planet.digbalaScore ?? 50,
+      digbalaPeakHouse: planet.digbalaPeakHouse ?? 1,
+      digbalaStatus: (planet.digbalaStatus as any) || 'Moderate',
+      dispositor: planet.dispositor,
+      dispositorPlanet: planetsMap.get(planet.dispositor) || null,
+    }))
+  }, [chart.dignityOverview, chart.planets, planetsMap])
 
   // Count aggregates
   const stats = useMemo(() => {

@@ -153,6 +153,7 @@ export const VedicChart: React.FC<VedicChartProps> = ({
           <NorthIndianChart
             lagnaSignIndex={lagnaSignIndex}
             planets={planets}
+            houses={chart.houses}
             selectedPlanet={selectedPlanet}
             selectedHouse={selectedHouse}
             showDegrees={showDegrees}
@@ -163,6 +164,7 @@ export const VedicChart: React.FC<VedicChartProps> = ({
           <SouthIndianChart
             lagnaSignIndex={lagnaSignIndex}
             planets={planets}
+            houses={chart.houses}
             selectedPlanet={selectedPlanet}
             selectedHouse={selectedHouse}
             showDegrees={showDegrees}

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import type { AstroChart, DashaPeriod } from '../../types/astro'
 import {
   PLANET_COLORS,
@@ -6,12 +6,20 @@ import {
   findDashaAncestors,
   isSamePeriod,
   getPeriodKey,
+  parseDateMs,
   type DashaChainItem,
 } from './dashaUtils'
+import { useNow } from '../../hooks/useNow'
 import { fetchExpandedSubPeriods } from '../../services/dashaApi'
 import { DashaCockpit } from './DashaCockpit'
 import { SambhandhaMatrix } from './SambhandhaMatrix'
 import { DashaInspector } from '../inspector/DashaInspector'
+
+const safeDateSlice = (d?: string | number | null, len = 10): string => {
+  if (typeof d === 'string') return d.slice(0, len)
+  if (d) return String(d).slice(0, len)
+  return '—'
+}
 
 interface DashaTimelineProps {
   chart: AstroChart
@@ -26,16 +34,39 @@ export const DashaTimeline: React.FC<DashaTimelineProps> = ({
   onSelectHouse,
   onSelectPeriod,
 }) => {
-  // 6-Level Hierarchy Selection State (tracks currently open/expanded branches)
-  const [selectedMd, setSelectedMd] = useState<DashaPeriod | null>(null) // Level 1
-  const [selectedAd, setSelectedAd] = useState<DashaPeriod | null>(null) // Level 2
-  const [selectedPd, setSelectedPd] = useState<DashaPeriod | null>(null) // Level 3
-  const [selectedSd, setSelectedSd] = useState<DashaPeriod | null>(null) // Level 4 (Sookshma)
-  const [selectedPrd, setSelectedPrd] = useState<DashaPeriod | null>(null) // Level 5 (Prana)
-  const [selectedDd, setSelectedDd] = useState<DashaPeriod | null>(null) // Level 6 (Deha / Sub-Sookshma)
+  const nowMs = useNow(30000)
+
+  // 6-Level Hierarchy Selection State (initialized lazily to avoid cascading mount renders)
+  const [selectedMd, setSelectedMd] = useState<DashaPeriod | null>(() => {
+    const live = findRunningDashaHierarchy(chart.dashaTree, Date.now(), chart.activeDashaChain || undefined)
+    return live.md || null
+  })
+  const [selectedAd, setSelectedAd] = useState<DashaPeriod | null>(() => {
+    const live = findRunningDashaHierarchy(chart.dashaTree, Date.now(), chart.activeDashaChain || undefined)
+    return live.ad || null
+  })
+  const [selectedPd, setSelectedPd] = useState<DashaPeriod | null>(() => {
+    const live = findRunningDashaHierarchy(chart.dashaTree, Date.now(), chart.activeDashaChain || undefined)
+    return live.pd || null
+  })
+  const [selectedSd, setSelectedSd] = useState<DashaPeriod | null>(() => {
+    const live = findRunningDashaHierarchy(chart.dashaTree, Date.now(), chart.activeDashaChain || undefined)
+    return live.sd || null
+  })
+  const [selectedPrd, setSelectedPrd] = useState<DashaPeriod | null>(() => {
+    const live = findRunningDashaHierarchy(chart.dashaTree, Date.now(), chart.activeDashaChain || undefined)
+    return live.prd || null
+  })
+  const [selectedDd, setSelectedDd] = useState<DashaPeriod | null>(() => {
+    const live = findRunningDashaHierarchy(chart.dashaTree, Date.now(), chart.activeDashaChain || undefined)
+    return live.dd || null
+  })
 
   // Explicitly Inspected Period (decoupled from lowest open branch)
-  const [inspectedPeriod, setInspectedPeriod] = useState<DashaPeriod | null>(null)
+  const [inspectedPeriod, setInspectedPeriod] = useState<DashaPeriod | null>(() => {
+    const live = findRunningDashaHierarchy(chart.dashaTree, Date.now(), chart.activeDashaChain || undefined)
+    return live.ad || live.md || null
+  })
 
   const [displayMode, setDisplayMode] = useState<'timeline' | 'table' | 'matrix'>('timeline')
   const [showMicroTiming, setShowMicroTiming] = useState<boolean>(false)
@@ -43,10 +74,13 @@ export const DashaTimeline: React.FC<DashaTimelineProps> = ({
   const [tableSearch, setTableSearch] = useState<string>('')
 
   const dashaTree = chart.dashaTree
+  const lastDashaTreeRef = useRef(chart.dashaTree)
 
-  // Automatic initial selection of live running dasha down to Level 6
+  // Automatic selection update ONLY when chart.dashaTree or activeDashaChain changes
   useEffect(() => {
-    const nowMs = Date.now()
+    if (lastDashaTreeRef.current === dashaTree) return
+    lastDashaTreeRef.current = dashaTree
+
     const live = findRunningDashaHierarchy(dashaTree, nowMs, chart.activeDashaChain || undefined)
     if (live.md) setSelectedMd(live.md)
     if (live.ad) setSelectedAd(live.ad)
@@ -57,19 +91,32 @@ export const DashaTimeline: React.FC<DashaTimelineProps> = ({
 
     // Initial inspection defaults to active Antardasha or Mahadasha for immediate high-value context
     setInspectedPeriod(live.ad || live.md || null)
-  }, [dashaTree, chart.activeDashaChain])
+  }, [dashaTree, chart.activeDashaChain, nowMs])
 
   // One-click Jump to live running dasha across all 6 levels
   const handleJumpToLive = () => {
-    const live = findRunningDashaHierarchy(dashaTree, Date.now(), chart.activeDashaChain || undefined)
+    const live = findRunningDashaHierarchy(dashaTree, nowMs, chart.activeDashaChain || undefined)
     if (live.md) setSelectedMd(live.md)
     if (live.ad) setSelectedAd(live.ad)
     if (live.pd) setSelectedPd(live.pd)
     if (live.sd) setSelectedSd(live.sd)
     if (live.prd) setSelectedPrd(live.prd)
     if (live.dd) setSelectedDd(live.dd)
-    setInspectedPeriod(live.ad || live.md || null)
+
+    const targetPeriod = live.ad || live.md || null
+    setInspectedPeriod(targetPeriod)
     setDisplayMode('timeline')
+
+    if (targetPeriod && onSelectPeriod) {
+      const chain: DashaChainItem[] = []
+      if (live.md) chain.push({ level: 1, levelLabel: 'MD', lord: live.md.lord, period: live.md })
+      if (live.ad) chain.push({ level: 2, levelLabel: 'AD', lord: live.ad.lord, period: live.ad })
+      if (live.pd) chain.push({ level: 3, levelLabel: 'PD', lord: live.pd.lord, period: live.pd })
+      if (live.sd) chain.push({ level: 4, levelLabel: 'SD', lord: live.sd.lord, period: live.sd })
+      if (live.prd) chain.push({ level: 5, levelLabel: 'PrD', lord: live.prd.lord, period: live.prd })
+      if (live.dd) chain.push({ level: 6, levelLabel: 'DD', lord: live.dd.lord, period: live.dd })
+      onSelectPeriod(targetPeriod, chain)
+    }
   }
 
   // Unified parent-child expansion model:
@@ -91,6 +138,7 @@ export const DashaTimeline: React.FC<DashaTimelineProps> = ({
       ancestors = findDashaAncestors(dashaTree, period)
     }
 
+    const chain: DashaChainItem[] = []
     if (level === 1) {
       setSelectedMd(period)
       setSelectedAd(null)
@@ -98,50 +146,81 @@ export const DashaTimeline: React.FC<DashaTimelineProps> = ({
       setSelectedSd(null)
       setSelectedPrd(null)
       setSelectedDd(null)
+      chain.push({ level: 1, levelLabel: 'MD', lord: period.lord, period })
     } else if (level === 2) {
-      if (ancestors && ancestors[0]) setSelectedMd(ancestors[0])
+      const md = (ancestors && ancestors[0]) || selectedMd
+      if (md) setSelectedMd(md)
       setSelectedAd(period)
       setSelectedPd(null)
       setSelectedSd(null)
       setSelectedPrd(null)
       setSelectedDd(null)
+      if (md) chain.push({ level: 1, levelLabel: 'MD', lord: md.lord, period: md })
+      chain.push({ level: 2, levelLabel: 'AD', lord: period.lord, period })
     } else if (level === 3) {
-      if (ancestors) {
-        if (ancestors[0]) setSelectedMd(ancestors[0])
-        if (ancestors[1]) setSelectedAd(ancestors[1])
-      }
+      const md = (ancestors && ancestors[0]) || selectedMd
+      const ad = (ancestors && ancestors[1]) || selectedAd
+      if (md) setSelectedMd(md)
+      if (ad) setSelectedAd(ad)
       setSelectedPd(period)
       setSelectedSd(null)
       setSelectedPrd(null)
       setSelectedDd(null)
+      if (md) chain.push({ level: 1, levelLabel: 'MD', lord: md.lord, period: md })
+      if (ad) chain.push({ level: 2, levelLabel: 'AD', lord: ad.lord, period: ad })
+      chain.push({ level: 3, levelLabel: 'PD', lord: period.lord, period })
     } else if (level === 4) {
-      if (ancestors) {
-        if (ancestors[0]) setSelectedMd(ancestors[0])
-        if (ancestors[1]) setSelectedAd(ancestors[1])
-        if (ancestors[2]) setSelectedPd(ancestors[2])
-      }
+      const md = (ancestors && ancestors[0]) || selectedMd
+      const ad = (ancestors && ancestors[1]) || selectedAd
+      const pd = (ancestors && ancestors[2]) || selectedPd
+      if (md) setSelectedMd(md)
+      if (ad) setSelectedAd(ad)
+      if (pd) setSelectedPd(pd)
       setSelectedSd(period)
       setSelectedPrd(null)
       setSelectedDd(null)
+      if (md) chain.push({ level: 1, levelLabel: 'MD', lord: md.lord, period: md })
+      if (ad) chain.push({ level: 2, levelLabel: 'AD', lord: ad.lord, period: ad })
+      if (pd) chain.push({ level: 3, levelLabel: 'PD', lord: pd.lord, period: pd })
+      chain.push({ level: 4, levelLabel: 'SD', lord: period.lord, period })
     } else if (level === 5) {
-      if (ancestors) {
-        if (ancestors[0]) setSelectedMd(ancestors[0])
-        if (ancestors[1]) setSelectedAd(ancestors[1])
-        if (ancestors[2]) setSelectedPd(ancestors[2])
-        if (ancestors[3]) setSelectedSd(ancestors[3])
-      }
+      const md = (ancestors && ancestors[0]) || selectedMd
+      const ad = (ancestors && ancestors[1]) || selectedAd
+      const pd = (ancestors && ancestors[2]) || selectedPd
+      const sd = (ancestors && ancestors[3]) || selectedSd
+      if (md) setSelectedMd(md)
+      if (ad) setSelectedAd(ad)
+      if (pd) setSelectedPd(pd)
+      if (sd) setSelectedSd(sd)
       setSelectedPrd(period)
       setSelectedDd(null)
+      if (md) chain.push({ level: 1, levelLabel: 'MD', lord: md.lord, period: md })
+      if (ad) chain.push({ level: 2, levelLabel: 'AD', lord: ad.lord, period: ad })
+      if (pd) chain.push({ level: 3, levelLabel: 'PD', lord: pd.lord, period: pd })
+      if (sd) chain.push({ level: 4, levelLabel: 'SD', lord: sd.lord, period: sd })
+      chain.push({ level: 5, levelLabel: 'PrD', lord: period.lord, period })
     } else if (level === 6) {
-      if (ancestors) {
-        if (ancestors[0]) setSelectedMd(ancestors[0])
-        if (ancestors[1]) setSelectedAd(ancestors[1])
-        if (ancestors[2]) setSelectedPd(ancestors[2])
-        if (ancestors[3]) setSelectedSd(ancestors[3])
-        if (ancestors[4]) setSelectedPrd(ancestors[4])
-      }
+      const md = (ancestors && ancestors[0]) || selectedMd
+      const ad = (ancestors && ancestors[1]) || selectedAd
+      const pd = (ancestors && ancestors[2]) || selectedPd
+      const sd = (ancestors && ancestors[3]) || selectedSd
+      const prd = (ancestors && ancestors[4]) || selectedPrd
+      if (md) setSelectedMd(md)
+      if (ad) setSelectedAd(ad)
+      if (pd) setSelectedPd(pd)
+      if (sd) setSelectedSd(sd)
+      if (prd) setSelectedPrd(prd)
       setSelectedDd(period)
+      if (md) chain.push({ level: 1, levelLabel: 'MD', lord: md.lord, period: md })
+      if (ad) chain.push({ level: 2, levelLabel: 'AD', lord: ad.lord, period: ad })
+      if (pd) chain.push({ level: 3, levelLabel: 'PD', lord: pd.lord, period: pd })
+      if (sd) chain.push({ level: 4, levelLabel: 'SD', lord: sd.lord, period: sd })
+      if (prd) chain.push({ level: 5, levelLabel: 'PrD', lord: prd.lord, period: prd })
+      chain.push({ level: 6, levelLabel: 'DD', lord: period.lord, period })
     }
+
+    // Call onSelectPeriod strictly in response to user selection interaction (NEVER inside an effect)
+    onSelectPeriod?.(period, chain)
   }
 
   // Active period to inspect: purely driven by explicit inspectedPeriod state.
@@ -160,13 +239,6 @@ export const DashaTimeline: React.FC<DashaTimelineProps> = ({
     if (selectedDd) chain.push({ level: 6, levelLabel: 'DD', lord: selectedDd.lord, period: selectedDd })
     return chain
   }, [selectedMd, selectedAd, selectedPd, selectedSd, selectedPrd, selectedDd])
-
-  // Sync with parent when selection changes
-  useEffect(() => {
-    if (activeInspectPeriod && onSelectPeriod) {
-      onSelectPeriod(activeInspectPeriod, hierarchyChain)
-    }
-  }, [activeInspectPeriod, hierarchyChain, onSelectPeriod])
 
   // Sub-period list derivations
   const adList = useMemo(() => {
@@ -237,56 +309,60 @@ export const DashaTimeline: React.FC<DashaTimelineProps> = ({
   }, [selectedPrd])
 
   // Generic helper for timeline calculations of any level list
-  const getTimelineBarData = (list: DashaPeriod[], activeSelection: DashaPeriod | null) => {
-    if (!list || list.length === 0) return { items: [], todayPct: -1 }
-    const first = list[0]
-    const last = list[list.length - 1]
-    const startMs = new Date(first.start).getTime()
-    const endMs = new Date(last.end).getTime()
-    const totalMs = Math.max(1, endMs - startMs)
-    const nowMs = Date.now()
+  const getTimelineBarData = useCallback(
+    (list: DashaPeriod[], activeSelection: DashaPeriod | null) => {
+      if (!list || list.length === 0) return { items: [], todayPct: -1 }
+      const first = list[0]
+      const last = list[list.length - 1]
+      const startMs = parseDateMs(first.start)
+      const endMs = parseDateMs(last.end)
+      const totalMs = Math.max(1, endMs - startMs)
 
-    let todayPct = -1
-    if (nowMs >= startMs && nowMs <= endMs) {
-      todayPct = ((nowMs - startMs) / totalMs) * 100
-    }
-
-    const items = list.map((item, idx) => {
-      const s = new Date(item.start).getTime()
-      const e = new Date(item.end).getTime()
-      const widthPct = Math.max(1, ((e - s) / totalMs) * 100)
-      const isRunning = s <= nowMs && nowMs <= e
-      const isSelected = isSamePeriod(activeSelection, item)
-      const isInspected = isSamePeriod(activeInspectPeriod, item)
-
-      // Find planet for dignity icon
-      const pl = chart.planets.find((p) => p.name.toLowerCase() === item.lord.toLowerCase())
-      let dignityIcon = ''
-      if (pl?.dignity === 'Exalted') dignityIcon = '👑'
-      else if (pl?.dignity === 'Own Sign') dignityIcon = '🏰'
-      else if (pl?.dignity === 'Debilitated') dignityIcon = '⚡'
-
-      return {
-        ...item,
-        uniqueKey: getPeriodKey(item, idx),
-        widthPct,
-        isRunning,
-        isSelected,
-        isInspected,
-        dignityIcon,
-        color: PLANET_COLORS[item.lord] || '#d97706',
+      let todayPct = -1
+      if (nowMs >= startMs && nowMs <= endMs) {
+        todayPct = ((nowMs - startMs) / totalMs) * 100
       }
-    })
 
-    return { items, todayPct }
-  }
+      const items = list.map((item, idx) => {
+        const s = parseDateMs(item.start)
+        const e = parseDateMs(item.end)
+        const widthPct = Math.max(1, ((e - s) / totalMs) * 100)
+        const isRunning = s <= nowMs && nowMs <= e
+        const isSelected = isSamePeriod(activeSelection, item)
 
-  const mdBar = useMemo(() => getTimelineBarData(dashaTree, selectedMd), [dashaTree, selectedMd, activeInspectPeriod])
-  const adBar = useMemo(() => getTimelineBarData(adList, selectedAd), [adList, selectedAd, activeInspectPeriod])
-  const pdBar = useMemo(() => getTimelineBarData(pdList, selectedPd), [pdList, selectedPd, activeInspectPeriod])
-  const sdBar = useMemo(() => getTimelineBarData(sdList, selectedSd), [sdList, selectedSd, activeInspectPeriod])
-  const prdBar = useMemo(() => getTimelineBarData(prdList, selectedPrd), [prdList, selectedPrd, activeInspectPeriod])
-  const ddBar = useMemo(() => getTimelineBarData(ddList, selectedDd), [ddList, selectedDd, activeInspectPeriod])
+        const lordName = item.lord || (item as any).period || 'Sun'
+        // Find planet for dignity icon
+        const pl = chart?.planets?.find((p) => (p.name || '').toLowerCase() === lordName.toLowerCase())
+        let dignityIcon = ''
+        if (pl?.dignity === 'Exalted') dignityIcon = '👑'
+        else if (pl?.dignity === 'Own Sign') dignityIcon = '🏰'
+        else if (pl?.dignity === 'Debilitated') dignityIcon = '⚡'
+
+        return {
+          ...item,
+          lord: lordName,
+          uniqueKey: getPeriodKey(item, idx),
+          widthPct,
+          isRunning,
+          isSelected,
+          dignityIcon,
+          color: PLANET_COLORS[lordName] || '#d97706',
+          startMs: s,
+          endMs: e,
+        }
+      })
+
+      return { items, todayPct }
+    },
+    [nowMs, chart?.planets]
+  )
+
+  const mdBar = useMemo(() => getTimelineBarData(dashaTree, selectedMd), [getTimelineBarData, dashaTree, selectedMd])
+  const adBar = useMemo(() => getTimelineBarData(adList, selectedAd), [getTimelineBarData, adList, selectedAd])
+  const pdBar = useMemo(() => getTimelineBarData(pdList, selectedPd), [getTimelineBarData, pdList, selectedPd])
+  const sdBar = useMemo(() => getTimelineBarData(sdList, selectedSd), [getTimelineBarData, sdList, selectedSd])
+  const prdBar = useMemo(() => getTimelineBarData(prdList, selectedPrd), [getTimelineBarData, prdList, selectedPrd])
+  const ddBar = useMemo(() => getTimelineBarData(ddList, selectedDd), [getTimelineBarData, ddList, selectedDd])
 
   const todayLabel = useMemo(() => {
     return new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
@@ -424,52 +500,55 @@ export const DashaTimeline: React.FC<DashaTimelineProps> = ({
                   </div>
                 )}
 
-                {mdBar.items.map((item) => (
-                  <div
-                    key={item.uniqueKey}
-                    onClick={() => handleSelectPeriod(item)}
-                    style={{
-                      width: `${item.widthPct}%`,
-                      height: '100%',
-                      background: item.isInspected
-                        ? `linear-gradient(180deg, ${item.color} 0%, rgba(30, 41, 59, 0.95) 100%)`
-                        : item.isSelected
-                        ? `linear-gradient(180deg, ${item.color}88 0%, rgba(15, 23, 42, 0.9) 100%)`
-                        : 'rgba(30, 41, 59, 0.7)',
-                      borderRight: '1px solid rgba(15, 23, 42, 0.8)',
-                      border: item.isInspected ? '2px solid #fbbf24' : undefined,
-                      borderTop: item.isInspected ? '2px solid #fbbf24' : item.isSelected ? `3px solid #fbbf24` : `3px solid ${item.color}`,
-                      boxShadow: item.isInspected ? '0 0 12px rgba(251, 191, 36, 0.7), inset 0 0 8px rgba(251, 191, 36, 0.35)' : undefined,
-                      zIndex: item.isInspected ? 5 : 1,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '2px',
-                      position: 'relative',
-                      overflow: 'hidden',
-                      transition: 'all 0.15s ease',
-                    }}
-                    title={`${item.lord} MD: ${item.start.slice(0, 10)} to ${item.end.slice(0, 10)} (Click to inspect)`}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <strong style={{ fontSize: '0.74rem', color: item.isInspected ? '#fff' : item.isSelected ? '#fff' : '#e2e8f0' }}>
-                        {item.lord}
-                      </strong>
-                      {item.dignityIcon && <span style={{ fontSize: '0.62rem' }}>{item.dignityIcon}</span>}
-                      {item.isInspected && <span style={{ fontSize: '0.55rem' }}>🔍</span>}
-                    </div>
-                    <span style={{ fontSize: '0.62rem', color: item.isInspected ? '#fde68a' : item.isSelected ? '#fde68a' : '#94a3b8' }}>
-                      {((new Date(item.end).getTime() - new Date(item.start).getTime()) / (365.25 * 24 * 3600 * 1000)).toFixed(1)}y
-                    </span>
-                    {item.isRunning && (
-                      <span style={{ position: 'absolute', bottom: 1, fontSize: '0.48rem', background: '#f59e0b', color: '#0f172a', fontWeight: 'bold', padding: '0 3px', borderRadius: 2 }}>
-                        LIVE
+                {mdBar.items.map((item) => {
+                  const isInspected = isSamePeriod(activeInspectPeriod, item)
+                  return (
+                    <div
+                      key={item.uniqueKey}
+                      onClick={() => handleSelectPeriod(item)}
+                      style={{
+                        width: `${item.widthPct}%`,
+                        height: '100%',
+                        background: isInspected
+                          ? `linear-gradient(180deg, ${item.color} 0%, rgba(30, 41, 59, 0.95) 100%)`
+                          : item.isSelected
+                          ? `linear-gradient(180deg, ${item.color}88 0%, rgba(15, 23, 42, 0.9) 100%)`
+                          : 'rgba(30, 41, 59, 0.7)',
+                        borderRight: '1px solid rgba(15, 23, 42, 0.8)',
+                        border: isInspected ? '2px solid #fbbf24' : undefined,
+                        borderTop: isInspected ? '2px solid #fbbf24' : item.isSelected ? `3px solid #fbbf24` : `3px solid ${item.color}`,
+                        boxShadow: isInspected ? '0 0 12px rgba(251, 191, 36, 0.7), inset 0 0 8px rgba(251, 191, 36, 0.35)' : undefined,
+                        zIndex: isInspected ? 5 : 1,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '2px',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        transition: 'all 0.15s ease',
+                      }}
+                      title={`${item.lord} MD: ${safeDateSlice(item.start)} to ${safeDateSlice(item.end)} (Click to inspect)`}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <strong style={{ fontSize: '0.74rem', color: isInspected ? '#fff' : item.isSelected ? '#fff' : '#e2e8f0' }}>
+                          {item.lord}
+                        </strong>
+                        {item.dignityIcon && <span style={{ fontSize: '0.62rem' }}>{item.dignityIcon}</span>}
+                        {isInspected && <span style={{ fontSize: '0.55rem' }}>🔍</span>}
+                      </div>
+                      <span style={{ fontSize: '0.62rem', color: isInspected ? '#fde68a' : item.isSelected ? '#fde68a' : '#94a3b8' }}>
+                        {((item.endMs - item.startMs) / (365.25 * 24 * 3600 * 1000)).toFixed(1)}y
                       </span>
-                    )}
-                  </div>
-                ))}
+                      {item.isRunning && (
+                        <span style={{ position: 'absolute', bottom: 1, fontSize: '0.48rem', background: '#f59e0b', color: '#0f172a', fontWeight: 'bold', padding: '0 3px', borderRadius: 2 }}>
+                          LIVE
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
 
@@ -488,7 +567,7 @@ export const DashaTimeline: React.FC<DashaTimelineProps> = ({
                       Track 2 • Antardashas within {selectedMd.lord} Mahadasha (Level 2)
                     </h4>
                     <span className="eyebrow" style={{ fontSize: '0.66rem' }}>
-                      {selectedMd.start.slice(0, 10)} → {selectedMd.end.slice(0, 10)} • Months scale • Click any to inspect
+                      {safeDateSlice(selectedMd.start)} → {safeDateSlice(selectedMd.end)} • Months scale • Click any to inspect
                     </span>
                   </div>
                   <span style={{ fontSize: '0.68rem', padding: '1px 6px', background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', borderRadius: 4 }}>
@@ -533,52 +612,55 @@ export const DashaTimeline: React.FC<DashaTimelineProps> = ({
                     </div>
                   )}
 
-                  {adBar.items.map((item) => (
-                    <div
-                      key={item.uniqueKey}
-                      onClick={() => handleSelectPeriod(item)}
-                      style={{
-                        width: `${item.widthPct}%`,
-                        height: '100%',
-                        background: item.isInspected
-                          ? `linear-gradient(180deg, ${item.color} 0%, rgba(30, 41, 59, 0.95) 100%)`
-                          : item.isSelected
-                          ? `linear-gradient(180deg, ${item.color}88 0%, rgba(15, 23, 42, 0.9) 100%)`
-                          : 'rgba(30, 41, 59, 0.7)',
-                        borderRight: '1px solid rgba(15, 23, 42, 0.8)',
-                        border: item.isInspected ? '2px solid #fbbf24' : undefined,
-                        borderTop: item.isInspected ? '2px solid #fbbf24' : item.isSelected ? `3px solid #fbbf24` : `3px solid ${item.color}`,
-                        boxShadow: item.isInspected ? '0 0 12px rgba(251, 191, 36, 0.7), inset 0 0 8px rgba(251, 191, 36, 0.35)' : undefined,
-                        zIndex: item.isInspected ? 5 : 1,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '2px',
-                        position: 'relative',
-                        overflow: 'hidden',
-                        transition: 'all 0.15s ease',
-                      }}
-                      title={`${selectedMd.lord}–${item.lord} AD: ${item.start.slice(0, 10)} to ${item.end.slice(0, 10)}`}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <strong style={{ fontSize: '0.72rem', color: item.isInspected ? '#fff' : item.isSelected ? '#fff' : '#e2e8f0' }}>
-                          {item.lord}
-                        </strong>
-                        {item.dignityIcon && <span style={{ fontSize: '0.6rem' }}>{item.dignityIcon}</span>}
-                        {item.isInspected && <span style={{ fontSize: '0.55rem' }}>🔍</span>}
-                      </div>
-                      <span style={{ fontSize: '0.6rem', color: item.isInspected ? '#fde68a' : item.isSelected ? '#fde68a' : '#94a3b8' }}>
-                        {((new Date(item.end).getTime() - new Date(item.start).getTime()) / (30.4375 * 24 * 3600 * 1000)).toFixed(1)}m
-                      </span>
-                      {item.isRunning && (
-                        <span style={{ position: 'absolute', bottom: 1, fontSize: '0.45rem', background: '#f59e0b', color: '#0f172a', fontWeight: 'bold', padding: '0 2px', borderRadius: 2 }}>
-                          LIVE
+                  {adBar.items.map((item) => {
+                    const isInspected = isSamePeriod(activeInspectPeriod, item)
+                    return (
+                      <div
+                        key={item.uniqueKey}
+                        onClick={() => handleSelectPeriod(item)}
+                        style={{
+                          width: `${item.widthPct}%`,
+                          height: '100%',
+                          background: isInspected
+                            ? `linear-gradient(180deg, ${item.color} 0%, rgba(30, 41, 59, 0.95) 100%)`
+                            : item.isSelected
+                            ? `linear-gradient(180deg, ${item.color}88 0%, rgba(15, 23, 42, 0.9) 100%)`
+                            : 'rgba(30, 41, 59, 0.7)',
+                          borderRight: '1px solid rgba(15, 23, 42, 0.8)',
+                          border: isInspected ? '2px solid #fbbf24' : undefined,
+                          borderTop: isInspected ? '2px solid #fbbf24' : item.isSelected ? `3px solid #fbbf24` : `3px solid ${item.color}`,
+                          boxShadow: isInspected ? '0 0 12px rgba(251, 191, 36, 0.7), inset 0 0 8px rgba(251, 191, 36, 0.35)' : undefined,
+                          zIndex: isInspected ? 5 : 1,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '2px',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          transition: 'all 0.15s ease',
+                        }}
+                        title={`${selectedMd.lord}–${item.lord} AD: ${safeDateSlice(item.start)} to ${safeDateSlice(item.end)}`}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <strong style={{ fontSize: '0.72rem', color: isInspected ? '#fff' : item.isSelected ? '#fff' : '#e2e8f0' }}>
+                            {item.lord}
+                          </strong>
+                          {item.dignityIcon && <span style={{ fontSize: '0.6rem' }}>{item.dignityIcon}</span>}
+                          {isInspected && <span style={{ fontSize: '0.55rem' }}>🔍</span>}
+                        </div>
+                        <span style={{ fontSize: '0.6rem', color: isInspected ? '#fde68a' : item.isSelected ? '#fde68a' : '#94a3b8' }}>
+                          {((item.endMs - item.startMs) / (30.4375 * 24 * 3600 * 1000)).toFixed(1)}m
                         </span>
-                      )}
-                    </div>
-                  ))}
+                        {item.isRunning && (
+                          <span style={{ position: 'absolute', bottom: 1, fontSize: '0.45rem', background: '#f59e0b', color: '#0f172a', fontWeight: 'bold', padding: '0 2px', borderRadius: 2 }}>
+                            LIVE
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -598,7 +680,7 @@ export const DashaTimeline: React.FC<DashaTimelineProps> = ({
                       Track 3 • Pratyantardashas within {selectedMd?.lord}–{selectedAd.lord} (Level 3)
                     </h4>
                     <span className="eyebrow" style={{ fontSize: '0.66rem' }}>
-                      {selectedAd.start.slice(0, 10)} → {selectedAd.end.slice(0, 10)} • Days scale • Click any to inspect
+                      {safeDateSlice(selectedAd.start)} → {safeDateSlice(selectedAd.end)} • Days scale • Click any to inspect
                     </span>
                   </div>
                   <span style={{ fontSize: '0.68rem', padding: '1px 6px', background: 'rgba(236, 72, 153, 0.15)', color: '#ec4899', borderRadius: 4 }}>
@@ -643,49 +725,52 @@ export const DashaTimeline: React.FC<DashaTimelineProps> = ({
                     </div>
                   )}
 
-                  {pdBar.items.map((item) => (
-                    <div
-                      key={item.uniqueKey}
-                      onClick={() => handleSelectPeriod(item)}
-                      style={{
-                        width: `${item.widthPct}%`,
-                        height: '100%',
-                        background: item.isInspected
-                          ? `linear-gradient(180deg, ${item.color} 0%, rgba(30, 41, 59, 0.95) 100%)`
-                          : item.isSelected
-                          ? `linear-gradient(180deg, ${item.color}88 0%, rgba(15, 23, 42, 0.9) 100%)`
-                          : 'rgba(30, 41, 59, 0.7)',
-                        borderRight: '1px solid rgba(15, 23, 42, 0.8)',
-                        border: item.isInspected ? '2px solid #fbbf24' : undefined,
-                        borderTop: item.isInspected ? '2px solid #fbbf24' : item.isSelected ? `3px solid #fbbf24` : `3px solid ${item.color}`,
-                        boxShadow: item.isInspected ? '0 0 12px rgba(251, 191, 36, 0.7), inset 0 0 8px rgba(251, 191, 36, 0.35)' : undefined,
-                        zIndex: item.isInspected ? 5 : 1,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '2px',
-                        position: 'relative',
-                        transition: 'all 0.15s ease',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <strong style={{ fontSize: '0.7rem', color: item.isInspected ? '#fff' : item.isSelected ? '#fff' : '#e2e8f0' }}>
-                          {item.lord}
-                        </strong>
-                        {item.isInspected && <span style={{ fontSize: '0.55rem' }}>🔍</span>}
-                      </div>
-                      <span style={{ fontSize: '0.58rem', color: item.isInspected ? '#fde68a' : item.isSelected ? '#fde68a' : '#94a3b8' }}>
-                        {Math.round((new Date(item.end).getTime() - new Date(item.start).getTime()) / (24 * 3600 * 1000))}d
-                      </span>
-                      {item.isRunning && (
-                        <span style={{ position: 'absolute', bottom: 1, fontSize: '0.45rem', background: '#f59e0b', color: '#0f172a', fontWeight: 'bold', padding: '0 2px', borderRadius: 2 }}>
-                          LIVE
+                  {pdBar.items.map((item) => {
+                    const isInspected = isSamePeriod(activeInspectPeriod, item)
+                    return (
+                      <div
+                        key={item.uniqueKey}
+                        onClick={() => handleSelectPeriod(item)}
+                        style={{
+                          width: `${item.widthPct}%`,
+                          height: '100%',
+                          background: isInspected
+                            ? `linear-gradient(180deg, ${item.color} 0%, rgba(30, 41, 59, 0.95) 100%)`
+                            : item.isSelected
+                            ? `linear-gradient(180deg, ${item.color}88 0%, rgba(15, 23, 42, 0.9) 100%)`
+                            : 'rgba(30, 41, 59, 0.7)',
+                          borderRight: '1px solid rgba(15, 23, 42, 0.8)',
+                          border: isInspected ? '2px solid #fbbf24' : undefined,
+                          borderTop: isInspected ? '2px solid #fbbf24' : item.isSelected ? `3px solid #fbbf24` : `3px solid ${item.color}`,
+                          boxShadow: isInspected ? '0 0 12px rgba(251, 191, 36, 0.7), inset 0 0 8px rgba(251, 191, 36, 0.35)' : undefined,
+                          zIndex: isInspected ? 5 : 1,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '2px',
+                          position: 'relative',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <strong style={{ fontSize: '0.7rem', color: isInspected ? '#fff' : item.isSelected ? '#fff' : '#e2e8f0' }}>
+                            {item.lord}
+                          </strong>
+                          {isInspected && <span style={{ fontSize: '0.55rem' }}>🔍</span>}
+                        </div>
+                        <span style={{ fontSize: '0.58rem', color: isInspected ? '#fde68a' : item.isSelected ? '#fde68a' : '#94a3b8' }}>
+                          {Math.round((item.endMs - item.startMs) / (24 * 3600 * 1000))}d
                         </span>
-                      )}
-                    </div>
-                  ))}
+                        {item.isRunning && (
+                          <span style={{ position: 'absolute', bottom: 1, fontSize: '0.45rem', background: '#f59e0b', color: '#0f172a', fontWeight: 'bold', padding: '0 2px', borderRadius: 2 }}>
+                            LIVE
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -720,32 +805,35 @@ export const DashaTimeline: React.FC<DashaTimelineProps> = ({
                       <span style={{ color: '#10b981' }}>Hours/Days • Click to inspect</span>
                     </div>
                     <div style={{ position: 'relative', width: '100%', height: 34, borderRadius: 4, background: 'rgba(15, 23, 42, 0.85)', display: 'flex' }}>
-                      {sdBar.items.map((item) => (
-                        <div
-                          key={item.uniqueKey}
-                          onClick={() => handleSelectPeriod(item)}
-                          style={{
-                            width: `${item.widthPct}%`,
-                            height: '100%',
-                            background: item.isInspected ? '#fbbf24' : item.isSelected ? item.color : 'rgba(30, 41, 59, 0.6)',
-                            borderRight: '1px solid rgba(15, 23, 42, 0.8)',
-                            border: item.isInspected ? '2px solid #fbbf24' : undefined,
-                            boxShadow: item.isInspected ? '0 0 10px rgba(251, 191, 36, 0.7)' : undefined,
-                            zIndex: item.isInspected ? 5 : 1,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.64rem',
-                            color: item.isInspected ? '#0f172a' : item.isSelected ? '#0f172a' : '#cbd5e1',
-                            fontWeight: 700,
-                            gap: 2,
-                          }}
-                        >
-                          <span>{item.lord.slice(0, 2)}</span>
-                          {item.isInspected && <span style={{ fontSize: '0.52rem' }}>🔍</span>}
-                        </div>
-                      ))}
+                      {sdBar.items.map((item) => {
+                        const isInspected = isSamePeriod(activeInspectPeriod, item)
+                        return (
+                          <div
+                            key={item.uniqueKey}
+                            onClick={() => handleSelectPeriod(item)}
+                            style={{
+                              width: `${item.widthPct}%`,
+                              height: '100%',
+                              background: isInspected ? '#fbbf24' : item.isSelected ? item.color : 'rgba(30, 41, 59, 0.6)',
+                              borderRight: '1px solid rgba(15, 23, 42, 0.8)',
+                              border: isInspected ? '2px solid #fbbf24' : undefined,
+                              boxShadow: isInspected ? '0 0 10px rgba(251, 191, 36, 0.7)' : undefined,
+                              zIndex: isInspected ? 5 : 1,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.64rem',
+                              color: isInspected ? '#0f172a' : item.isSelected ? '#0f172a' : '#cbd5e1',
+                              fontWeight: 700,
+                              gap: 2,
+                            }}
+                          >
+                            <span>{item.lord.slice(0, 2)}</span>
+                            {isInspected && <span style={{ fontSize: '0.52rem' }}>🔍</span>}
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )}
@@ -758,32 +846,35 @@ export const DashaTimeline: React.FC<DashaTimelineProps> = ({
                       <span style={{ color: '#a855f7' }}>1–50 Hours • Click to inspect</span>
                     </div>
                     <div style={{ position: 'relative', width: '100%', height: 30, borderRadius: 4, background: 'rgba(15, 23, 42, 0.85)', display: 'flex' }}>
-                      {prdBar.items.map((item) => (
-                        <div
-                          key={item.uniqueKey}
-                          onClick={() => handleSelectPeriod(item)}
-                          style={{
-                            width: `${item.widthPct}%`,
-                            height: '100%',
-                            background: item.isInspected ? '#fbbf24' : item.isSelected ? item.color : 'rgba(30, 41, 59, 0.6)',
-                            borderRight: '1px solid rgba(15, 23, 42, 0.8)',
-                            border: item.isInspected ? '2px solid #fbbf24' : undefined,
-                            boxShadow: item.isInspected ? '0 0 10px rgba(251, 191, 36, 0.7)' : undefined,
-                            zIndex: item.isInspected ? 5 : 1,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.6rem',
-                            color: item.isInspected ? '#0f172a' : item.isSelected ? '#0f172a' : '#cbd5e1',
-                            fontWeight: 700,
-                            gap: 2,
-                          }}
-                        >
-                          <span>{item.lord.slice(0, 2)}</span>
-                          {item.isInspected && <span style={{ fontSize: '0.5rem' }}>🔍</span>}
-                        </div>
-                      ))}
+                      {prdBar.items.map((item) => {
+                        const isInspected = isSamePeriod(activeInspectPeriod, item)
+                        return (
+                          <div
+                            key={item.uniqueKey}
+                            onClick={() => handleSelectPeriod(item)}
+                            style={{
+                              width: `${item.widthPct}%`,
+                              height: '100%',
+                              background: isInspected ? '#fbbf24' : item.isSelected ? item.color : 'rgba(30, 41, 59, 0.6)',
+                              borderRight: '1px solid rgba(15, 23, 42, 0.8)',
+                              border: isInspected ? '2px solid #fbbf24' : undefined,
+                              boxShadow: isInspected ? '0 0 10px rgba(251, 191, 36, 0.7)' : undefined,
+                              zIndex: isInspected ? 5 : 1,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.6rem',
+                              color: isInspected ? '#0f172a' : item.isSelected ? '#0f172a' : '#cbd5e1',
+                              fontWeight: 700,
+                              gap: 2,
+                            }}
+                          >
+                            <span>{item.lord.slice(0, 2)}</span>
+                            {isInspected && <span style={{ fontSize: '0.5rem' }}>🔍</span>}
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )}
@@ -796,32 +887,35 @@ export const DashaTimeline: React.FC<DashaTimelineProps> = ({
                       <span style={{ color: '#ef4444' }}>Minutes • Somatic somatic timing</span>
                     </div>
                     <div style={{ position: 'relative', width: '100%', height: 28, borderRadius: 4, background: 'rgba(15, 23, 42, 0.85)', display: 'flex' }}>
-                      {ddBar.items.map((item) => (
-                        <div
-                          key={item.uniqueKey}
-                          onClick={() => handleSelectPeriod(item)}
-                          style={{
-                            width: `${item.widthPct}%`,
-                            height: '100%',
-                            background: item.isInspected ? '#fbbf24' : item.isSelected ? item.color : 'rgba(30, 41, 59, 0.6)',
-                            borderRight: '1px solid rgba(15, 23, 42, 0.8)',
-                            border: item.isInspected ? '2px solid #fbbf24' : undefined,
-                            boxShadow: item.isInspected ? '0 0 10px rgba(251, 191, 36, 0.7)' : undefined,
-                            zIndex: item.isInspected ? 5 : 1,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.58rem',
-                            color: item.isInspected ? '#0f172a' : item.isSelected ? '#0f172a' : '#cbd5e1',
-                            fontWeight: 700,
-                            gap: 2,
-                          }}
-                        >
-                          <span>{item.lord.slice(0, 2)}</span>
-                          {item.isInspected && <span style={{ fontSize: '0.48rem' }}>🔍</span>}
-                        </div>
-                      ))}
+                      {ddBar.items.map((item) => {
+                        const isInspected = isSamePeriod(activeInspectPeriod, item)
+                        return (
+                          <div
+                            key={item.uniqueKey}
+                            onClick={() => handleSelectPeriod(item)}
+                            style={{
+                              width: `${item.widthPct}%`,
+                              height: '100%',
+                              background: isInspected ? '#fbbf24' : item.isSelected ? item.color : 'rgba(30, 41, 59, 0.6)',
+                              borderRight: '1px solid rgba(15, 23, 42, 0.8)',
+                              border: isInspected ? '2px solid #fbbf24' : undefined,
+                              boxShadow: isInspected ? '0 0 10px rgba(251, 191, 36, 0.7)' : undefined,
+                              zIndex: isInspected ? 5 : 1,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.58rem',
+                              color: isInspected ? '#0f172a' : item.isSelected ? '#0f172a' : '#cbd5e1',
+                              fontWeight: 700,
+                              gap: 2,
+                            }}
+                          >
+                            <span>{item.lord.slice(0, 2)}</span>
+                            {isInspected && <span style={{ fontSize: '0.48rem' }}>🔍</span>}
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )}
@@ -957,8 +1051,9 @@ export const DashaTimeline: React.FC<DashaTimelineProps> = ({
                 {dashaTree
                   .filter((md) => tableFilterMd === 'all' || md.lord === tableFilterMd)
                   .map((md, mdIdx) => {
-                    const nowStr = new Date().toISOString().slice(0, 10)
-                    const isMdRunning = md.start.slice(0, 10) <= nowStr && nowStr <= md.end.slice(0, 10)
+                    const mdStartMs = parseDateMs(md.start)
+                    const mdEndMs = parseDateMs(md.end)
+                    const isMdRunning = mdStartMs <= nowMs && nowMs <= mdEndMs
                     const subAds = md.children || []
 
                     return (
@@ -982,10 +1077,10 @@ export const DashaTimeline: React.FC<DashaTimelineProps> = ({
                               {md.lord}
                             </span>
                           </td>
-                          <td style={{ padding: '10px 10px' }}>{md.start.slice(0, 10)}</td>
-                          <td style={{ padding: '10px 10px' }}>{md.end.slice(0, 10)}</td>
+                          <td style={{ padding: '10px 10px' }}>{safeDateSlice(md.start)}</td>
+                          <td style={{ padding: '10px 10px' }}>{safeDateSlice(md.end)}</td>
                           <td style={{ padding: '10px 10px' }}>
-                            {((new Date(md.end).getTime() - new Date(md.start).getTime()) / (365.25 * 24 * 3600 * 1000)).toFixed(1)} yrs
+                            {((mdEndMs - mdStartMs) / (365.25 * 24 * 3600 * 1000)).toFixed(1)} yrs
                           </td>
                           <td style={{ padding: '10px 10px' }}>
                             {isMdRunning ? (
@@ -994,7 +1089,7 @@ export const DashaTimeline: React.FC<DashaTimelineProps> = ({
                               </span>
                             ) : (
                               <span style={{ color: '#64748b' }}>
-                                {nowStr > md.end.slice(0, 10) ? 'Completed' : 'Upcoming'}
+                                {nowMs > mdEndMs ? 'Completed' : 'Upcoming'}
                               </span>
                             )}
                           </td>
@@ -1005,13 +1100,15 @@ export const DashaTimeline: React.FC<DashaTimelineProps> = ({
                             if (!tableSearch) return true
                             const q = tableSearch.toLowerCase()
                             return (
-                              ad.lord.toLowerCase().includes(q) ||
-                              ad.start.includes(q) ||
-                              ad.end.includes(q)
+                              (ad.lord || '').toLowerCase().includes(q) ||
+                              (ad.start || '').includes(q) ||
+                              (ad.end || '').includes(q)
                             )
                           })
                           .map((ad, adIdx) => {
-                            const isAdRunning = ad.start.slice(0, 10) <= nowStr && nowStr <= ad.end.slice(0, 10)
+                            const adStartMs = parseDateMs(ad.start)
+                            const adEndMs = parseDateMs(ad.end)
+                            const isAdRunning = adStartMs <= nowMs && nowMs <= adEndMs
                             return (
                               <tr
                                 key={getPeriodKey(ad, adIdx)}
@@ -1031,10 +1128,10 @@ export const DashaTimeline: React.FC<DashaTimelineProps> = ({
                                 <td style={{ padding: '6px 10px', color: PLANET_COLORS[ad.lord] || '#94a3b8' }}>
                                   {ad.lord}
                                 </td>
-                                <td style={{ padding: '6px 10px', color: '#94a3b8' }}>{ad.start.slice(0, 10)}</td>
-                                <td style={{ padding: '6px 10px', color: '#94a3b8' }}>{ad.end.slice(0, 10)}</td>
+                                <td style={{ padding: '6px 10px', color: '#94a3b8' }}>{safeDateSlice(ad.start)}</td>
+                                <td style={{ padding: '6px 10px', color: '#94a3b8' }}>{safeDateSlice(ad.end)}</td>
                                 <td style={{ padding: '6px 10px', color: '#94a3b8' }}>
-                                  {((new Date(ad.end).getTime() - new Date(ad.start).getTime()) / (30.4375 * 24 * 3600 * 1000)).toFixed(1)} mos
+                                  {((adEndMs - adStartMs) / (30.4375 * 24 * 3600 * 1000)).toFixed(1)} mos
                                 </td>
                                 <td style={{ padding: '6px 10px' }}>
                                   {isAdRunning && (

@@ -42,150 +42,57 @@ export const AspectsMatrix: React.FC<AspectsMatrixProps> = ({
     return map
   }, [chart.houses])
 
-  // Determine whether planet is natural benefic or malefic
-  const getCasterNature = (planetName: string): 'benefic' | 'malefic' => {
-    if (['Jupiter', 'Venus'].includes(planetName)) return 'benefic'
-    if (['Saturn', 'Mars', 'Rahu', 'Ketu', 'Sun'].includes(planetName)) return 'malefic'
-    if (planetName === 'Mercury') {
-      // Benefic unless conjunct malefic
-      const merc = planetsMap.get('Mercury')
-      if (merc) {
-        const conjunctMalefic = chart.planets.some(
-          (p) => p.houseNumber === merc.houseNumber && ['Saturn', 'Mars', 'Rahu', 'Ketu', 'Sun'].includes(p.name)
-        )
-        return conjunctMalefic ? 'malefic' : 'benefic'
+  // Retrieve Parashari aspect calculated by backend engine
+  const getAspect = (planet: PlanetPosition, hNum: number): AspectDetail | null => {
+    if (chart.aspectsMatrix?.bhavaAspects?.[planet.name]?.[hNum] !== undefined) {
+      return chart.aspectsMatrix.bhavaAspects[planet.name][hNum]
+    }
+    const found = planet.aspectsCast?.find((a) => a.house === hNum)
+    if (found) {
+      return {
+        houseDistance: ((hNum - planet.houseNumber + 12) % 12) + 1,
+        virupas: (found as any).virupas || 60,
+        strengthLabel: found.type,
+        isSpecial: (found as any).isSpecial || false,
+        isFull: (found as any).isFull || true,
+        casterType: (found as any).casterType || 'benefic',
+        description: (found as any).description || found.type,
       }
-      return 'benefic'
     }
-    if (planetName === 'Moon') {
-      // Natural benefic unless deeply waning
-      return 'benefic'
-    }
-    return 'benefic'
-  }
-
-  // Calculate Parashari Drishti from planet to house
-  const calculateAspect = (caster: PlanetPosition, targetHouseNum: number): AspectDetail | null => {
-    const distance = ((targetHouseNum - caster.houseNumber + 12) % 12) + 1
-    const casterNature = getCasterNature(caster.name)
-
-    if (distance === 1) {
-      // Sthita (occupying)
+    if (planet.houseNumber === hNum) {
       return {
         houseDistance: 1,
         virupas: 60,
         strengthLabel: 'Occupies',
         isSpecial: false,
         isFull: true,
-        casterType: casterNature,
-        description: `Occupies ${caster.houseOrdinal} house directly`,
+        casterType: 'benefic',
+        description: `Occupies ${planet.houseOrdinal} house directly`,
       }
     }
-
-    // 7th Full aspect for all planets
-    if (distance === 7) {
-      return {
-        houseDistance: 7,
-        virupas: 60,
-        strengthLabel: '7th Full (60v)',
-        isSpecial: false,
-        isFull: true,
-        casterType: casterNature,
-        description: 'Universal 7th House Full Drishti (100% influence)',
-      }
-    }
-
-    // Mars special aspects: 4th and 8th
-    if (caster.name === 'Mars' && (distance === 4 || distance === 8)) {
-      return {
-        houseDistance: distance,
-        virupas: 60,
-        strengthLabel: `${distance}th Special (60v)`,
-        isSpecial: true,
-        isFull: true,
-        casterType: 'malefic',
-        description: `Mars Special Full Drishti on ${distance}th house`,
-      }
-    }
-
-    // Jupiter & Rahu/Ketu special aspects: 5th and 9th (Trikona Drishti)
-    if (['Jupiter', 'Rahu', 'Ketu'].includes(caster.name) && (distance === 5 || distance === 9)) {
-      return {
-        houseDistance: distance,
-        virupas: 60,
-        strengthLabel: `${distance}th Special (60v)`,
-        isSpecial: true,
-        isFull: true,
-        casterType: casterNature,
-        description: `${caster.name} Special Full Drishti on ${distance}th house`,
-      }
-    }
-
-    // Saturn special aspects: 3rd and 10th
-    if (caster.name === 'Saturn' && (distance === 3 || distance === 10)) {
-      return {
-        houseDistance: distance,
-        virupas: 60,
-        strengthLabel: `${distance}th Special (60v)`,
-        isSpecial: true,
-        isFull: true,
-        casterType: 'malefic',
-        description: `Saturn Special Full Drishti on ${distance}th house`,
-      }
-    }
-
-    // Partial Aspects (Virupas)
-    if (distance === 3 || distance === 10) {
-      return {
-        houseDistance: distance,
-        virupas: 30,
-        strengthLabel: `${distance}th Partial (30v)`,
-        isSpecial: false,
-        isFull: false,
-        casterType: casterNature,
-        description: `Partial Drishti (50% strength) on ${distance}th house`,
-      }
-    }
-
-    if (distance === 5 || distance === 9) {
-      return {
-        houseDistance: distance,
-        virupas: 30,
-        strengthLabel: `${distance}th Partial (30v)`,
-        isSpecial: false,
-        isFull: false,
-        casterType: casterNature,
-        description: `Partial Drishti (50% strength) on ${distance}th house`,
-      }
-    }
-
-    if (distance === 4 || distance === 8) {
-      return {
-        houseDistance: distance,
-        virupas: 15,
-        strengthLabel: `${distance}th Quarter (15v)`,
-        isSpecial: false,
-        isFull: false,
-        casterType: casterNature,
-        description: `Quarter Drishti (25% strength) on ${distance}th house`,
-      }
-    }
-
     return null
   }
 
-  // Calculate mutual aspect between two planets
-  const calculateMutualAspect = (pA: PlanetPosition, pB: PlanetPosition) => {
+  // Retrieve mutual aspect calculated by backend engine
+  const getMutualAspect = (pA: PlanetPosition, pB: PlanetPosition) => {
+    if (chart.aspectsMatrix?.mutualAspects?.[pA.name]?.[pB.name] !== undefined) {
+      return chart.aspectsMatrix.mutualAspects[pA.name][pB.name]
+    }
     if (pA.name === pB.name) return null
-    const aspectAtoB = calculateAspect(pA, pB.houseNumber)
-    const aspectBtoA = calculateAspect(pB, pA.houseNumber)
-
+    const aToB = getAspect(pA, pB.houseNumber)
+    const bToA = getAspect(pB, pA.houseNumber)
     return {
-      aToB: aspectAtoB,
-      bToA: aspectBtoA,
-      isMutual: Boolean(aspectAtoB && aspectBtoA && aspectAtoB.isFull && aspectBtoA.isFull),
+      aToB,
+      bToA,
+      isMutual: Boolean(aToB && bToA && aToB.isFull && bToA.isFull),
       isConjunction: pA.houseNumber === pB.houseNumber,
     }
+  }
+
+  const getCasterNature = (grahaName: string): 'benefic' | 'malefic' => {
+    const asp = chart.aspectsMatrix?.bhavaAspects?.[grahaName]?.[1]
+    if (asp?.casterType) return asp.casterType
+    return ['Jupiter', 'Venus', 'Moon'].includes(grahaName) ? 'benefic' : 'malefic'
   }
 
   return (
@@ -456,7 +363,7 @@ export const AspectsMatrix: React.FC<AspectsMatrixProps> = ({
                     </td>
 
                     {Array.from({ length: 12 }, (_, i) => i + 1).map((hNum) => {
-                      const aspect = calculateAspect(planet, hNum)
+                      const aspect = getAspect(planet, hNum)
                       const house = housesMap.get(hNum)
                       const isOccupant = planet.houseNumber === hNum
 
@@ -670,7 +577,7 @@ export const AspectsMatrix: React.FC<AspectsMatrixProps> = ({
                         )
                       }
 
-                      const mutual = calculateMutualAspect(casterPlanet, targetPlanet)
+                      const mutual = getMutualAspect(casterPlanet, targetPlanet)
                       if (!mutual) return null
 
                       if (mutual.isConjunction) {

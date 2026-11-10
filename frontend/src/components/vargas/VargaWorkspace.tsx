@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react'
-import type { AstroChart, DignityType } from '../../types/astro'
+import type { AstroChart } from '../../types/astro'
 import { VARGA_CATALOG, type VargaInfo } from '../../data/vargaData'
 import { VedicChart } from '../chart/VedicChart'
 import { VargaComparison } from './VargaComparison'
-import { ZODIAC_SIGNS, EXALTATION_SIGNS, DEBILITATION_SIGNS, OWN_SIGNS } from '../../types/astro'
+import { ZODIAC_SIGNS } from '../../types/astro'
 
 interface VargaWorkspaceProps {
   chart: AstroChart
@@ -54,29 +54,16 @@ export const VargaWorkspace: React.FC<VargaWorkspaceProps> = ({
 
   const currentVargaData = chart.vargas[selectedVargaCode] || chart.vargas['D1']
 
+  // Grahas with varga dignities, dispositors and vargottama calculated by backend
   const vargaPlanetsWithDetails = useMemo(() => {
     if (!currentVargaData) return []
-    return currentVargaData.grahas.map((g) => {
-      let dignity: DignityType = 'Neutral'
-      if (EXALTATION_SIGNS[g.name] === g.signIndex) dignity = 'Exalted'
-      else if (DEBILITATION_SIGNS[g.name] === g.signIndex) dignity = 'Debilitated'
-      else if (OWN_SIGNS[g.name]?.includes(g.signIndex)) dignity = 'Own Sign'
-
-      const signInfo = ZODIAC_SIGNS[g.signIndex]
-      const dispositor = signInfo ? signInfo.lord : '—'
-
-      // Check if Vargottama with D1
-      const d1Planet = chart.planets.find((p) => p.name === g.name)
-      const isVargottama = d1Planet ? d1Planet.signIndex === g.signIndex : false
-
-      return {
-        ...g,
-        dignity,
-        dispositor,
-        isVargottama,
-      }
-    })
-  }, [currentVargaData, chart.planets])
+    return currentVargaData.grahas.map((g) => ({
+      ...g,
+      dignity: g.dignity || 'Neutral',
+      dispositor: g.dispositor || ZODIAC_SIGNS[g.signIndex]?.lord || '—',
+      isVargottama: g.isVargottama ?? false,
+    }))
+  }, [currentVargaData])
 
   return (
     <div className="varga-workspace-container" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>

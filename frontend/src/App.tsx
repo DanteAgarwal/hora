@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import './App.css'
 import type { AstroChart, BirthData, DashaPeriod } from './types/astro'
 import type { DashaChainItem } from './components/timing/dashaUtils'
@@ -86,9 +86,25 @@ function App() {
   const [savedCharts, setSavedCharts] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [showCreateModal, setShowCreateModal] = useState(false)
   const [helpTermId, setHelpTermId] = useState<string | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
   const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline'>('checking')
+
+  const handleSelectPlanet = useCallback((pName: string) => {
+    setSelectedPlanet(pName)
+    setInspectorTab('planet')
+  }, [])
+
+  const handleSelectHouse = useCallback((hNum: number) => {
+    setSelectedHouse(hNum)
+    setInspectorTab('house')
+  }, [])
+
+  const handleSelectPeriod = useCallback((period: DashaPeriod, chain?: DashaChainItem[]) => {
+    setSelectedDashaPeriod(period)
+    if (chain) setDashaHierarchyChain(chain)
+    setInspectorTab('dasha')
+  }, [])
 
   // Check backend health on mount
   useEffect(() => {
@@ -469,47 +485,25 @@ function App() {
         {selectedNav === 'Timing' && (
           <DashaTimeline
             chart={chart}
-            onSelectPlanet={(pName) => {
-              setSelectedPlanet(pName)
-              setInspectorTab('planet')
-            }}
-            onSelectHouse={(hNum) => {
-              setSelectedHouse(hNum)
-              setInspectorTab('house')
-            }}
-            onSelectPeriod={(period, chain) => {
-              setSelectedDashaPeriod(period)
-              setDashaHierarchyChain(chain)
-              setInspectorTab('dasha')
-            }}
+            onSelectPlanet={handleSelectPlanet}
+            onSelectHouse={handleSelectHouse}
+            onSelectPeriod={handleSelectPeriod}
           />
         )}
 
         {selectedNav === 'Analysis' && (
           <AnalysisWorkspace
             chart={chart}
-            onSelectPlanet={(pName) => {
-              setSelectedPlanet(pName)
-              setInspectorTab('planet')
-            }}
-            onSelectHouse={(hNum) => {
-              setSelectedHouse(hNum)
-              setInspectorTab('house')
-            }}
+            onSelectPlanet={handleSelectPlanet}
+            onSelectHouse={handleSelectHouse}
           />
         )}
 
         {selectedNav === 'Research' && (
           <ResearchWorkspace
             chart={chart}
-            onSelectPlanet={(pName) => {
-              setSelectedPlanet(pName)
-              setInspectorTab('planet')
-            }}
-            onSelectHouse={(hNum) => {
-              setSelectedHouse(hNum)
-              setInspectorTab('house')
-            }}
+            onSelectPlanet={handleSelectPlanet}
+            onSelectHouse={handleSelectHouse}
             onApplySettings={handleApplySettings}
             isRecalculating={loading}
           />

@@ -1472,12 +1472,7 @@ tbody tr:hover {
 }
 
 .today-marker {
-  animation: todayPulse 2.5s infinite ease-in-out;
-}
-
-@keyframes todayPulse {
-  0%, 100% { filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.8)); }
-  50% { filter: drop-shadow(0 0 12px rgba(245, 158, 11, 1)); }
+  filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.85));
 }
 
 .breadcrumb-bar button:hover {

@@ -1,6 +1,8 @@
 import React from 'react'
 import type { AstroChart } from '../../types/astro'
 import { ZODIAC_SIGNS } from '../../types/astro'
+import { useNow } from '../../hooks/useNow'
+import { parseDateMs } from '../timing/dashaUtils'
 
 interface VedicCockpitProps {
   chart: AstroChart
@@ -17,6 +19,7 @@ export const VedicCockpit: React.FC<VedicCockpitProps> = ({
   onNavigateToAnalysis,
   onNavigateToTiming,
 }) => {
+  const now = useNow(30000)
   const { quickFacts, metadata, panchanga, planets, houses, yogas } = chart
 
   // Lagna planet & lord details
@@ -57,9 +60,8 @@ export const VedicCockpit: React.FC<VedicCockpitProps> = ({
   const dashaPeriod = chart.dashaTree?.[0]
   let dashaProgressPct = 45 // fallback visual progress
   if (dashaPeriod && dashaPeriod.start && dashaPeriod.end) {
-    const s = new Date(dashaPeriod.start).getTime()
-    const e = new Date(dashaPeriod.end).getTime()
-    const now = Date.now()
+    const s = parseDateMs(dashaPeriod.start)
+    const e = parseDateMs(dashaPeriod.end)
     if (!isNaN(s) && !isNaN(e) && e > s) {
       dashaProgressPct = Math.min(100, Math.max(0, Math.round(((now - s) / (e - s)) * 100)))
     }

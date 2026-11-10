@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { PlanetBadge } from './PlanetBadge'
-import type { PlanetPosition, VargaGrahaPlacement } from '../../types/astro'
+import type { HousePosition, PlanetPosition, VargaGrahaPlacement } from '../../types/astro'
 
 interface NorthIndianChartProps {
   lagnaSignIndex: number // 0 to 11
@@ -8,6 +8,7 @@ interface NorthIndianChartProps {
   selectedPlanet?: string
   selectedHouse?: number
   showDegrees?: boolean
+  houses?: HousePosition[]
   onSelectPlanet?: (planetName: string) => void
   onSelectHouse?: (houseNumber: number) => void
 }
@@ -100,6 +101,7 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
   selectedPlanet,
   selectedHouse,
   showDegrees = true,
+  houses,
   onSelectPlanet,
   onSelectHouse,
 }) => {
@@ -217,6 +219,27 @@ export const NorthIndianChart: React.FC<NorthIndianChartProps> = ({
               >
                 {signNum}
               </text>
+
+              {/* Arudhas in this house (e.g. AL, UL, A10) */}
+              {(() => {
+                const hObj = houses?.find((h) => h.number === hd.number)
+                if (!hObj?.arudhasHere || hObj.arudhasHere.length === 0) return null
+                return (
+                  <text
+                    x={hd.signPos.x}
+                    y={hd.signPos.y + (hd.number === 1 ? 16 : 14)}
+                    fill="#fbbf24"
+                    fontSize="9.5"
+                    fontWeight="700"
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fontFamily="'JetBrains Mono', monospace"
+                    style={{ pointerEvents: 'none', userSelect: 'none' }}
+                  >
+                    {hObj.arudhasHere.join(' ')}
+                  </text>
+                )
+              })()}
             </g>
           )
         })}

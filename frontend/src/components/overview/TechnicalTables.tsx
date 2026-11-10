@@ -12,7 +12,7 @@ interface TechnicalTablesProps {
   onSelectHouse: (houseNumber: number) => void
 }
 
-type PlanetFilter = 'all' | 'benefics' | 'malefics' | 'special' | 'dignified' | 'kendras' | 'trikonas'
+type PlanetFilter = 'all' | 'benefics' | 'malefics' | 'special' | 'vakri' | 'dignified' | 'kendras' | 'trikonas'
 
 export const TechnicalTables: React.FC<TechnicalTablesProps> = ({
   chart,
@@ -38,6 +38,8 @@ export const TechnicalTables: React.FC<TechnicalTablesProps> = ({
         return chart.planets.filter((p) => naturalMalefics.includes(p.name))
       case 'special':
         return chart.planets.filter((p) => p.retrograde || p.combust)
+      case 'vakri':
+        return chart.planets.filter((p) => p.retrograde)
       case 'dignified':
         return chart.planets.filter(
           (p) => p.dignity === 'Exalted' || p.dignity === 'Own Sign' || p.dignity === 'Moolatrikona'
@@ -114,6 +116,13 @@ export const TechnicalTables: React.FC<TechnicalTablesProps> = ({
             onClick={() => setPlanetFilter('malefics')}
           >
             🔥 Malefics
+          </button>
+          <button
+            type="button"
+            className={`filter-chip ${planetFilter === 'vakri' ? 'active' : ''}`}
+            onClick={() => setPlanetFilter('vakri')}
+          >
+            🪐 Vakri Only
           </button>
           <button
             type="button"
@@ -296,10 +305,27 @@ export const TechnicalTables: React.FC<TechnicalTablesProps> = ({
                     {/* Astronomical Motion & Speed */}
                     <td className="cell-speed">
                       <div className="speed-wrap">
-                        <span className="speed-val">
-                          {planet.speed !== undefined ? `${planet.speed > 0 ? '+' : ''}${planet.speed.toFixed(2)}°/d` : '—'}
+                        <span className="speed-val" style={{ fontFamily: 'monospace' }}>
+                          {planet.speed !== undefined ? `${planet.speed > 0 ? '+' : ''}${planet.speed.toFixed(3)}°/d` : '—'}
                         </span>
-                        {planet.retrograde && <span className="motion-tag-retro">Vakri</span>}
+                        {planet.retrograde ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <span
+                              className="motion-tag-retro"
+                              style={{ fontWeight: 700 }}
+                              title="BPHS 27.22: Vakra (60 Virupas Chesta Bala)"
+                            >
+                              [R] Vakri (60V)
+                            </span>
+                            {planet.vakri?.dignity?.retrograde_classical_effect && (
+                              <span style={{ fontSize: '0.62rem', color: '#fbbf24', lineHeight: 1.1 }}>
+                                {planet.vakri.dignity.retrograde_classical_effect.split(' ')[0]} Effect
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Direct</span>
+                        )}
                         {planet.combust && <span className="motion-tag-combust">Asta</span>}
                       </div>
                     </td>
@@ -389,6 +415,11 @@ export const TechnicalTables: React.FC<TechnicalTablesProps> = ({
                         >
                           <span>{lordPlanet.symbol}</span>
                           <strong>{house.lord}</strong>
+                          {lordPlanet.retrograde && (
+                            <span style={{ color: '#f59e0b', fontSize: '0.68rem', fontWeight: 700, marginLeft: 3 }} title="Vakri (Retrograde with 60 Virupas Chesta Bala)">
+                              [R]
+                            </span>
+                          )}
                         </button>
                       ) : (
                         <strong>{house.lord}</strong>
@@ -403,6 +434,11 @@ export const TechnicalTables: React.FC<TechnicalTablesProps> = ({
                           <span className={`dignity-micro-pill dign-${lordPlanet.dignity?.toLowerCase().replace(/\s+/g, '-')}`}>
                             {lordPlanet.dignity}
                           </span>
+                          {lordPlanet.retrograde && (
+                            <span style={{ color: '#fbbf24', fontSize: '0.65rem', fontWeight: 600 }}>
+                              60V Chesta
+                            </span>
+                          )}
                         </div>
                       ) : (
                         <span className="subtle-dim">—</span>
@@ -424,10 +460,15 @@ export const TechnicalTables: React.FC<TechnicalTablesProps> = ({
                                   e.stopPropagation()
                                   onSelectPlanet(occName)
                                 }}
-                                title={`${occName} (${p?.dignity || 'In House'})`}
+                                title={`${occName} (${p?.dignity || 'In House'})${p?.retrograde ? ' [Vakri, 60V]' : ''}`}
                               >
                                 <span>{p?.symbol || '✦'}</span>
                                 <span>{occName}</span>
+                                {p?.retrograde && (
+                                  <span style={{ color: '#f59e0b', fontSize: '0.65rem', fontWeight: 700, marginLeft: 2 }}>
+                                    [R]
+                                  </span>
+                                )}
                               </button>
                             )
                           })}

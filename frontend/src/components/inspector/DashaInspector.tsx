@@ -9,10 +9,11 @@ import {
   getActivatedHouses,
   getMahadashaProfile,
   getPeriodKey,
-  isSamePeriod,
+  parseDateMs,
   type DashaChainItem,
 } from '../timing/dashaUtils'
 import { fetchExpandedSubPeriods } from '../../services/dashaApi'
+import { useNow } from '../../hooks/useNow'
 
 interface DashaInspectorProps {
   chart: AstroChart
@@ -24,6 +25,12 @@ interface DashaInspectorProps {
   onOpenHelp?: (termId: string) => void
 }
 
+const safeDateSlice = (d?: string | number | null, len = 10): string => {
+  if (typeof d === 'string') return d.slice(0, len)
+  if (d) return String(d).slice(0, len)
+  return '—'
+}
+
 export const DashaInspector: React.FC<DashaInspectorProps> = ({
   chart,
   selectedPeriod,
@@ -33,8 +40,9 @@ export const DashaInspector: React.FC<DashaInspectorProps> = ({
   onSelectPeriod,
   onOpenHelp,
 }) => {
+  const nowMs = useNow()
   // If no period selected, fall back to the first available period or live period
-  const activePeriod = selectedPeriod || chart.dashaTree[0] || null
+  const activePeriod = selectedPeriod || chart?.dashaTree?.[0] || null
 
   // Find the planet position corresponding to this period's lord
   const lordName = activePeriod?.lord || ''
@@ -141,9 +149,8 @@ export const DashaInspector: React.FC<DashaInspectorProps> = ({
   // Progress & duration calculations
   const timingStats = useMemo(() => {
     if (!activePeriod?.start || !activePeriod?.end) return null
-    const startMs = new Date(activePeriod.start).getTime()
-    const endMs = new Date(activePeriod.end).getTime()
-    const nowMs = Date.now()
+    const startMs = parseDateMs(activePeriod.start)
+    const endMs = parseDateMs(activePeriod.end)
 
     if (isNaN(startMs) || isNaN(endMs) || endMs <= startMs) return null
 
@@ -199,7 +206,7 @@ export const DashaInspector: React.FC<DashaInspectorProps> = ({
       durationFormatted,
       remainingFormatted,
     }
-  }, [activePeriod])
+  }, [activePeriod, nowMs])
 
   // Sambhandha with Mahadasha Lord (Root Period) for Sub-periods (Level > 1)
   const sambhandha = useMemo(() => {
@@ -340,7 +347,7 @@ export const DashaInspector: React.FC<DashaInspectorProps> = ({
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, fontSize: '0.76rem', flexWrap: 'wrap', gap: 4 }}>
             <span style={{ color: '#cbd5e1' }}>
-              📅 <strong>{activePeriod.start.slice(0, 10)}</strong> → <strong>{activePeriod.end.slice(0, 10)}</strong>
+              📅 <strong>{safeDateSlice(activePeriod?.start)}</strong> → <strong>{safeDateSlice(activePeriod?.end)}</strong>
             </span>
             <span style={{ color: '#fbbf24', fontWeight: 700 }}>
               {mdProfile ? `${mdProfile.totalYears} Years (${mdProfile.lifespanPct}% of 120-Yr Lifespan)` : timingStats?.durationFormatted}
@@ -654,9 +661,8 @@ export const DashaInspector: React.FC<DashaInspectorProps> = ({
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 6 }}>
               {childSubPeriods.map((ad, adIdx) => {
                 const adColor = PLANET_COLORS[ad.lord] || '#94a3b8'
-                const nowMs = Date.now()
-                const sMs = new Date(ad.start).getTime()
-                const eMs = new Date(ad.end).getTime()
+                const sMs = parseDateMs(ad.start)
+                const eMs = parseDateMs(ad.end)
                 const isLive = sMs <= nowMs && nowMs <= eMs
                 const isPast = nowMs > eMs
                 const durationMos = ((eMs - sMs) / (30.4375 * 24 * 3600 * 1000)).toFixed(1)
@@ -692,7 +698,7 @@ export const DashaInspector: React.FC<DashaInspectorProps> = ({
                       )}
                     </div>
                     <div style={{ fontSize: '0.64rem', color: '#94a3b8', marginBottom: 4 }}>
-                      {ad.start.slice(0, 10)} → {ad.end.slice(0, 10)}
+                      {safeDateSlice(ad.start)} → {safeDateSlice(ad.end)}
                     </div>
                     <button
                       type="button"
@@ -867,7 +873,7 @@ export const DashaInspector: React.FC<DashaInspectorProps> = ({
         <div className="inspector-section" style={{ background: 'rgba(15, 23, 42, 0.6)', padding: 12, borderRadius: 6, border: '1px solid rgba(148, 163, 184, 0.12)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, fontSize: '0.74rem' }}>
             <span style={{ color: '#94a3b8' }}>
-              {activePeriod.start.slice(0, 10)} → {activePeriod.end.slice(0, 10)}
+              {safeDateSlice(activePeriod?.start)} → {safeDateSlice(activePeriod?.end)}
             </span>
             <span style={{ color: '#f8fafc', fontWeight: 600 }}>
               {timingStats.durationFormatted}
@@ -1194,9 +1200,8 @@ export const DashaInspector: React.FC<DashaInspectorProps> = ({
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 6 }}>
             {childSubPeriods.map((sub, sIdx) => {
               const subColor = PLANET_COLORS[sub.lord] || '#94a3b8'
-              const nowMs = Date.now()
-              const sMs = new Date(sub.start).getTime()
-              const eMs = new Date(sub.end).getTime()
+              const sMs = parseDateMs(sub.start)
+              const eMs = parseDateMs(sub.end)
               const isLive = sMs <= nowMs && nowMs <= eMs
               const isPast = nowMs > eMs
               const totalDays = (eMs - sMs) / (24 * 3600 * 1000)
@@ -1233,7 +1238,7 @@ export const DashaInspector: React.FC<DashaInspectorProps> = ({
                     )}
                   </div>
                   <div style={{ fontSize: '0.64rem', color: '#94a3b8', marginBottom: 4 }}>
-                    {sub.start.slice(0, 10)} → {sub.end.slice(0, 10)}
+                    {safeDateSlice(sub.start)} → {safeDateSlice(sub.end)}
                   </div>
                   <button
                     type="button"

@@ -42,6 +42,9 @@ export const DashaCockpit: React.FC<DashaCockpitProps> = ({
   const activeMdLord = selectedMd?.lord || liveHierarchy.md?.lord || 'Sun'
   const activeAdLord = selectedAd?.lord || liveHierarchy.ad?.lord || 'Moon'
 
+  const mdPlanet = chart.planets.find((p) => p.name.toLowerCase() === String(activeMdLord).toLowerCase())
+  const adPlanet = chart.planets.find((p) => p.name.toLowerCase() === String(activeAdLord).toLowerCase())
+
   // Mutual Sambhandha calculation for the active MD ↔ AD pair
   const sambhandha = useMemo(() => {
     return calculateSambhandha(activeMdLord, activeAdLord, chart)
@@ -208,6 +211,8 @@ export const DashaCockpit: React.FC<DashaCockpitProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             {liveHierarchy.chain.slice(0, 3).map((item, idx) => {
               const itemColor = PLANET_COLORS[item.lord] || '#d97706'
+              const pl = chart.planets.find((p) => p.name.toLowerCase() === String(item.lord).toLowerCase())
+              const isVakri = pl ? Boolean(pl.retrograde) : Boolean(item.isRetrograde)
               return (
                 <React.Fragment key={`${item.levelLabel}-${item.lord}-${idx}`}>
                   <button
@@ -235,6 +240,11 @@ export const DashaCockpit: React.FC<DashaCockpitProps> = ({
                       }}
                     >
                       {item.lord} <small style={{ color: '#94a3b8' }}>({item.levelLabel})</small>
+                      {isVakri && (
+                        <span style={{ color: '#f59e0b', marginLeft: 3, fontWeight: 800 }} title="Vakri (Retrograde with 60 Virupas Chesta Bala)">
+                          [R]
+                        </span>
+                      )}
                     </span>
                   </button>
                   {idx < 2 && <span style={{ color: '#64748b', fontSize: '0.75rem' }}>›</span>}
@@ -405,6 +415,53 @@ export const DashaCockpit: React.FC<DashaCockpitProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Vakri Dasha Influence Banner (Spec v1.0 / Phaladeepika 20.14) */}
+      {(mdPlanet?.retrograde || adPlanet?.retrograde) && (
+        <div
+          style={{
+            background: 'linear-gradient(90deg, rgba(217, 119, 6, 0.18), rgba(15, 23, 42, 0.75))',
+            border: '1px solid rgba(245, 158, 11, 0.4)',
+            borderRadius: 6,
+            padding: '8px 12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 8,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: '1.1rem' }}>🪐</span>
+            <div style={{ fontSize: '0.78rem', color: '#f8fafc' }}>
+              <strong style={{ color: '#fbbf24' }}>
+                Active Vakri Dasha Influence:
+              </strong>{' '}
+              {mdPlanet?.retrograde && adPlanet?.retrograde
+                ? `Both MD Lord ${mdPlanet.name} and AD Lord ${adPlanet.name} are Vakri (Retrograde with 60 Virupas Chesta Bala each).`
+                : mdPlanet?.retrograde
+                ? `MD Lord ${mdPlanet.name} is Vakri (Retrograde with 60 Virupas Chesta Bala).`
+                : `AD Lord ${adPlanet?.name} is Vakri (Retrograde with 60 Virupas Chesta Bala).`}
+              <span style={{ color: '#cbd5e1', marginLeft: 6 }}>
+                Phaladeepika 20.14: Stimulates heightened motional drive and internal karmic deliberation. Fruition arrives through persistent recursive effort rather than standard passive ease.
+              </span>
+            </div>
+          </div>
+          <span
+            style={{
+              fontSize: '0.68rem',
+              fontWeight: 700,
+              background: 'rgba(245, 158, 11, 0.25)',
+              color: '#fbbf24',
+              padding: '2px 8px',
+              borderRadius: 4,
+              border: '1px solid rgba(245, 158, 11, 0.4)',
+            }}
+          >
+            60 Virupas Chesta
+          </span>
+        </div>
+      )}
     </div>
   )
 }

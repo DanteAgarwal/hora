@@ -17,7 +17,7 @@ interface ConfigurationPanelProps {
   isRecalculating?: boolean
 }
 
-export const AYANAMSHA_OPTIONS = [
+const AYANAMSHA_OPTIONS = [
   { value: 'lahiri', label: 'Lahiri (Chitrapaksha)', desc: 'Standard Indian Calendar Reform Committee default (JHora 8.0)' },
   { value: 'krishnamurti', label: 'Krishnamurti (KP)', desc: 'Used extensively in KP astrology; ~0°06\' lower than Lahiri' },
   { value: 'raman', label: 'B.V. Raman', desc: 'Dr. B.V. Raman ayanamsha; ~1°27\' lower than Lahiri' },
@@ -28,7 +28,7 @@ export const AYANAMSHA_OPTIONS = [
   { value: 'tropical', label: 'Tropical (Sayana)', desc: '0° Ayanamsha (Western Tropical Zodiac relative to equinox)' },
 ]
 
-export const HOUSE_SYSTEM_OPTIONS = [
+const HOUSE_SYSTEM_OPTIONS = [
   { value: 'whole_sign', label: 'Whole Sign (Parashari)', desc: 'Rashi = Bhava; 1st house is entire rising sign (Vedic default)' },
   { value: 'equal_lagna', label: 'Equal from Lagna Degree', desc: 'Each house is exactly 30° centered on or starting at Lagna' },
   { value: 'sripati', label: 'Sripati (Classical Indian)', desc: 'Unequal bhava division based on Lagna & Midheaven (MC)' },
@@ -38,19 +38,19 @@ export const HOUSE_SYSTEM_OPTIONS = [
   { value: 'porphyry', label: 'Porphyry', desc: 'Trisection of quadrant arcs between angles' },
 ]
 
-export const NODE_OPTIONS = [
+const NODE_OPTIONS = [
   { value: 'true', label: 'True Node (Osculating)', desc: 'Instantaneous lunar orbital node including wobbles & nutation' },
   { value: 'mean', label: 'Mean Node (Averaged)', desc: 'Linear uniform precession at 19.34° per year (JHora default)' },
 ]
 
-export const SUNRISE_OPTIONS = [
+const SUNRISE_OPTIONS = [
   { value: 'disc_upper_limb', label: 'Upper Limb of Solar Disc', desc: 'IAU standard with atmospheric refraction (Recommended by BPHS)' },
   { value: 'traditional_hindu', label: 'Traditional Hindu (Center, No Refraction)', desc: 'Swiss Ephemeris SE_BIT_HINDU_RISING' },
   { value: 'disc_center', label: 'Disc Center (With Refraction)', desc: 'Center of solar disc on true horizon' },
   { value: 'geometric_center', label: 'Geometric Center (No Refraction)', desc: 'Geometric horizon crossing' },
 ]
 
-export const DASHA_YEAR_OPTIONS = [
+const DASHA_YEAR_OPTIONS = [
   { value: 'sidereal', label: 'Sidereal Year (365.25636 d)', desc: 'Astronomical sidereal solar return year (Standard)' },
   { value: 'tropical', label: 'Tropical Year (365.24219 d)', desc: 'Equinoctial year cycle' },
   { value: 'civil', label: 'Civil Year (365.25 d)', desc: 'Standard Julian 365.25 day calendar year' },

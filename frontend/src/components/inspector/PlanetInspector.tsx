@@ -185,6 +185,108 @@ export const PlanetInspector: React.FC<PlanetInspectorProps> = ({
         </div>
       </div>
 
+      {/* Vakri Graha Intelligence Section (Spec v1.0) */}
+      {(planet.retrograde || Boolean(planet.vakri)) && (
+        <div
+          className="inspector-section"
+          style={{
+            marginTop: 12,
+            background: 'linear-gradient(135deg, rgba(217, 119, 6, 0.14), rgba(15, 23, 42, 0.85))',
+            border: '1.5px solid rgba(245, 158, 11, 0.5)',
+            borderRadius: 8,
+            padding: '12px 14px',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: '1.1rem' }}>🪐</span>
+              <strong style={{ fontSize: '0.88rem', color: '#fbbf24' }}>
+                Vakri Graha Intelligence
+              </strong>
+            </div>
+            <span
+              style={{
+                fontSize: '0.68rem',
+                fontWeight: 700,
+                background: 'rgba(245, 158, 11, 0.25)',
+                color: '#fbbf24',
+                padding: '2px 8px',
+                borderRadius: 4,
+                border: '1px solid rgba(245, 158, 11, 0.4)',
+              }}
+            >
+              Chesta Bala: {planet.vakri?.chesta_bala?.traditional_chesta_value ?? 60} Virupas (BPHS 27.22)
+            </span>
+          </div>
+
+          {/* Key Metrics Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 8 }}>
+            <div style={{ background: 'rgba(15, 23, 42, 0.7)', padding: '6px 8px', borderRadius: 5, border: '1px solid rgba(148, 163, 184, 0.2)' }}>
+              <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Motional Velocity & Motion</div>
+              <div style={{ fontSize: '0.8rem', color: '#f8fafc', fontWeight: 600, fontFamily: 'monospace' }}>
+                {planet.vakri?.motion?.daily_speed !== undefined ? `${planet.vakri.motion.daily_speed.toFixed(4)}°/d` : (planet.speed !== undefined ? `${planet.speed.toFixed(4)}°/d` : 'Retrograde')}
+                <span style={{ color: '#fbbf24', fontSize: '0.72rem', marginLeft: 4 }}>
+                  ({planet.vakri?.chesta_bala?.motion_category || planet.vakri?.motion?.motion_category || 'Vakra'})
+                </span>
+              </div>
+            </div>
+
+            <div style={{ background: 'rgba(15, 23, 42, 0.7)', padding: '6px 8px', borderRadius: 5, border: '1px solid rgba(148, 163, 184, 0.2)' }}>
+              <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Dignity Preservation (Rule E)</div>
+              <div style={{ fontSize: '0.8rem', color: '#f8fafc', fontWeight: 600 }}>
+                Actual: <span style={{ color: dignityColor }}>{planet.vakri?.dignity?.actual || planet.dignity}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Interpretive Qualification (Phaladeepika 9.20 & Motional Drive) */}
+          <div style={{ background: 'rgba(30, 41, 59, 0.65)', borderRadius: 6, padding: '8px 10px', marginBottom: 8, fontSize: '0.76rem', lineHeight: 1.45 }}>
+            <div style={{ color: '#e2e8f0', marginBottom: 4 }}>
+              <strong>Motional Dynamics & Classical Effect:</strong>{' '}
+              {planet.vakri?.dignity?.retrograde_classical_effect ? (
+                <span style={{ color: '#38bdf8' }}>{planet.vakri.dignity.retrograde_classical_effect}</span>
+              ) : (
+                <span style={{ color: '#38bdf8' }}>Phaladeepika 9.20 notes heightened manifest intensity akin to exaltation in motional drive, while actual sign dignity remains untouched.</span>
+              )}
+            </div>
+            {planet.vakri?.interpretation?.summary && (
+              <div style={{ color: '#cbd5e1', fontStyle: 'italic', marginTop: 4 }}>
+                "{planet.vakri.interpretation.summary}"
+              </div>
+            )}
+          </div>
+
+          {/* Applicable Classical Sourced Rules */}
+          {planet.vakri?.classical_rules && planet.vakri.classical_rules.length > 0 && (
+            <div>
+              <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4, fontWeight: 700 }}>
+                Classical Shastra Sourced Rules ({planet.vakri.classical_rules.length})
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {planet.vakri.classical_rules.slice(0, 3).map((r) => (
+                  <div
+                    key={r.rule_id}
+                    style={{
+                      background: 'rgba(15, 23, 42, 0.5)',
+                      border: '1px solid rgba(245, 158, 11, 0.25)',
+                      borderRadius: 4,
+                      padding: '4px 8px',
+                      fontSize: '0.72rem',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <strong style={{ color: '#fbbf24' }}>{r.text_title} {r.chapter_verse}</strong>
+                      <span style={{ color: '#94a3b8', fontSize: '0.66rem' }}>Confidence: {r.confidence}</span>
+                    </div>
+                    <div style={{ color: '#cbd5e1', marginTop: 2 }}>{r.translation}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Astrological Functional Role & Nature */}
       <div className="inspector-section" style={{ marginTop: 12 }}>
         <p className="eyebrow">Functional Role (Lagna Perspective)</p>

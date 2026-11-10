@@ -4,6 +4,9 @@ import { AspectsMatrix } from './AspectsMatrix'
 import { DignityStrengthOverview } from './DignityStrengthOverview'
 import { BhavaPurusharthaBalance } from './BhavaPurusharthaBalance'
 import { PlanetaryYogasSummary } from './PlanetaryYogasSummary'
+import { AshtakavargaArudhasView } from './AshtakavargaArudhasView'
+import { LongevityMarakasView } from './LongevityMarakasView'
+import { VakriGrahaIntelligenceView } from './VakriGrahaIntelligenceView'
 
 interface AnalysisWorkspaceProps {
   chart: AstroChart
@@ -11,7 +14,7 @@ interface AnalysisWorkspaceProps {
   onSelectHouse?: (houseNumber: number) => void
 }
 
-type AnalysisTab = 'overview' | 'aspects' | 'dignity' | 'purushartha' | 'yogas'
+type AnalysisTab = 'overview' | 'aspects' | 'dignity' | 'vakri' | 'purushartha' | 'yogas' | 'ashtakavarga' | 'longevity'
 
 export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = ({
   chart,
@@ -21,6 +24,7 @@ export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = ({
   const [activeTab, setActiveTab] = useState<AnalysisTab>('overview')
 
   const yogasCount = chart.yogas?.length || 0
+  const retroCount = chart.planets?.filter(p => p.retrograde && !['Rahu', 'Ketu'].includes(p.name)).length || 0
 
   return (
     <div className="analysis-workspace-root" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -97,7 +101,10 @@ export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = ({
             { id: 'overview', label: '📊 Executive Overview', badge: 'Summary' },
             { id: 'aspects', label: '👁️ Aspects Matrix (Drishti)', badge: '9×12 Grid' },
             { id: 'dignity', label: '👑 Planetary Dignity & Strength', badge: 'Ledger' },
+            { id: 'vakri', label: '🪐 Vakri Graha Intelligence', badge: `${retroCount} Vakri` },
             { id: 'purushartha', label: '⚖️ Purushartha & Bhava Balance', badge: '4 Aims' },
+            { id: 'ashtakavarga', label: '🔢 Ashtakavarga & Arudhas', badge: 'SAV/BAV' },
+            { id: 'longevity', label: '🛡️ Baadhakas & Marakas', badge: 'Longevity' },
             { id: 'yogas', label: '⚜️ Classical Yogas', badge: String(yogasCount) },
           ].map((tab) => {
             const isActive = activeTab === tab.id
@@ -111,7 +118,9 @@ export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = ({
                   borderRadius: 10,
                   border: '1px solid',
                   borderColor: isActive ? '#d4ab5c' : 'rgba(255, 255, 255, 0.08)',
-                  background: isActive ? 'linear-gradient(135deg, rgba(212, 171, 92, 0.22), rgba(212, 171, 92, 0.08))' : 'rgba(255, 255, 255, 0.02)',
+                  background: isActive
+                    ? 'linear-gradient(135deg, rgba(212, 171, 92, 0.22), rgba(212, 171, 92, 0.08))'
+                    : 'rgba(255, 255, 255, 0.02)',
                   color: isActive ? '#fbbf24' : '#cbd5e1',
                   fontWeight: isActive ? 700 : 500,
                   fontSize: '0.84rem',
@@ -202,7 +211,7 @@ export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = ({
                 className="text-button"
                 style={{ fontSize: '0.78rem', color: '#fbbf24', background: 'none', border: 0, cursor: 'pointer' }}
               >
-                Expand Drishti Grid →
+                Inspect Drishti Matrix →
               </button>
             </div>
             <AspectsMatrix
@@ -212,11 +221,11 @@ export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = ({
             />
           </div>
 
-          {/* Bottom: Classical Yogas Top Highlight */}
+          {/* Bottom: Classical Yogas Snapshot */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
               <h3 style={{ margin: 0, fontSize: '1rem', color: '#f8fafc', fontWeight: 700 }}>
-                ⚜️ Foundational Classical Yogas
+                ✨ Classical Planetary Yogas ({yogasCount})
               </h3>
               <button
                 type="button"
@@ -224,7 +233,7 @@ export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = ({
                 className="text-button"
                 style={{ fontSize: '0.78rem', color: '#fbbf24', background: 'none', border: 0, cursor: 'pointer' }}
               >
-                View All {yogasCount} Yogas →
+                Browse All Yogas →
               </button>
             </div>
             <PlanetaryYogasSummary
@@ -236,7 +245,7 @@ export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = ({
         </div>
       )}
 
-      {/* Tab 2: Full Aspects Matrix */}
+      {/* Tab 2: Graha Drishti Aspects Matrix */}
       {activeTab === 'aspects' && (
         <AspectsMatrix
           chart={chart}
@@ -254,6 +263,15 @@ export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = ({
         />
       )}
 
+      {/* Tab: Vakri Graha Intelligence */}
+      {activeTab === 'vakri' && (
+        <VakriGrahaIntelligenceView
+          chart={chart}
+          onSelectPlanet={onSelectPlanet}
+          onSelectHouse={onSelectHouse}
+        />
+      )}
+
       {/* Tab 4: Purushartha & Bhavas */}
       {activeTab === 'purushartha' && (
         <BhavaPurusharthaBalance
@@ -263,7 +281,25 @@ export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = ({
         />
       )}
 
-      {/* Tab 5: Classical Yogas */}
+      {/* Tab 5: Ashtakavarga & Arudhas */}
+      {activeTab === 'ashtakavarga' && (
+        <AshtakavargaArudhasView
+          chart={chart}
+          onSelectPlanet={onSelectPlanet}
+          onSelectHouse={onSelectHouse}
+        />
+      )}
+
+      {/* Tab 6: Baadhakas & Marakas */}
+      {activeTab === 'longevity' && (
+        <LongevityMarakasView
+          chart={chart}
+          onSelectPlanet={onSelectPlanet}
+          onSelectHouse={onSelectHouse}
+        />
+      )}
+
+      {/* Tab 7: Classical Yogas */}
       {activeTab === 'yogas' && (
         <PlanetaryYogasSummary
           chart={chart}

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react'
 import type { BirthData } from '../../types/astro'
 import { CITIES_DATABASE, POPULAR_QUICK_CITIES, type CityOption } from '../../cities'
 
-export const SAMPLE_PRESETS: { label: string; name: string; year: number; month: number; day: number; hour: number; minute: number; second: number; cityName: string }[] = [
+const SAMPLE_PRESETS: { label: string; name: string; year: number; month: number; day: number; hour: number; minute: number; second: number; cityName: string }[] = [
   { label: 'Sample Natal (Agra)', name: 'Sample Natal (Agra)', year: 1995, month: 8, day: 24, hour: 10, minute: 30, second: 0, cityName: 'Agra' },
   { label: 'Lord Rama', name: 'Sri Rama (Chaitra Navami)', year: -5000, month: 1, day: 10, hour: 12, minute: 0, second: 0, cityName: 'Ayodhya' },
   { label: 'Lord Krishna', name: 'Sri Krishna (Janmashtami)', year: -3228, month: 7, day: 19, hour: 0, minute: 0, second: 0, cityName: 'Mathura' },

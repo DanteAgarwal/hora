@@ -25,6 +25,20 @@ export const HouseInspector: React.FC<HouseInspectorProps> = ({
   const karakaName = house.naturalKaraka?.split(' ')[0] || ''
   const karakaPlanet = chart.planets.find((p) => p.name === karakaName)
 
+  // Check if any retrograde planet casts special Module G offset results on this house
+  const specialVakriOffsets = (chart.planets || []).filter((p) => {
+    if (!p.retrograde) return false
+    const h = p.houseNumber || 1
+    let offset = 0
+    if (p.name === 'Mars' || p.name === 'Mercury') offset = 4
+    else if (p.name === 'Jupiter') offset = 5
+    else if (p.name === 'Venus') offset = 7
+    else if (p.name === 'Saturn') offset = 9
+    if (!offset) return false
+    const targetHouse = ((h - 1 + offset - 1) % 12) + 1
+    return targetHouse === house.number
+  })
+
   // Derive placement interpretation for the house lord
   const getLordPlacementInsight = () => {
     if (!lordPlanet) return 'Lord placement details unavailable.'
@@ -157,6 +171,22 @@ export const HouseInspector: React.FC<HouseInspectorProps> = ({
               <div style={{ marginTop: 6, color: '#94a3b8', fontStyle: 'italic' }}>
                 {getLordPlacementInsight()}
               </div>
+              {lordPlanet.retrograde && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: '8px 10px',
+                    background: 'rgba(217, 119, 6, 0.15)',
+                    border: '1px solid rgba(245, 158, 11, 0.4)',
+                    borderRadius: 5,
+                    fontSize: '0.74rem',
+                    color: '#fbbf24',
+                    lineHeight: 1.45,
+                  }}
+                >
+                  <strong>🪐 Vakri Lord:</strong> Lord {house.lord} is in retrograde motion (60 Virupas Chesta Bala under BPHS 27.22). Motional strength deepens and internalizes the affairs of House {house.number}, requiring persistent, recursive effort and deliberate internal reappraisal before outward fruition.
+                </div>
+              )}
             </div>
           ) : (
             <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
@@ -236,6 +266,21 @@ export const HouseInspector: React.FC<HouseInspectorProps> = ({
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {occPlanet?.retrograde && (
+                      <span
+                        className="badge"
+                        style={{
+                          fontSize: '0.68rem',
+                          background: 'rgba(245, 158, 11, 0.2)',
+                          color: '#f59e0b',
+                          border: '1px solid rgba(245, 158, 11, 0.4)',
+                          fontWeight: 700,
+                        }}
+                        title="Vakri (Retrograde, 60 Virupas Chesta Bala under BPHS 27.22)"
+                      >
+                        [R] Vakri (60V)
+                      </span>
+                    )}
                     {occPlanet && (
                       <span
                         className="badge"
@@ -302,6 +347,35 @@ export const HouseInspector: React.FC<HouseInspectorProps> = ({
           </p>
         )}
       </div>
+
+      {/* Module G Retrograde House Influence (Alternative Tradition) */}
+      {specialVakriOffsets.length > 0 && (
+        <div className="inspector-section" style={{ marginTop: 14 }}>
+          <p className="eyebrow">Module G Retrograde House Influence (Alternative Tradition)</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+            {specialVakriOffsets.map((vp) => (
+              <div
+                key={vp.name}
+                style={{
+                  background: 'rgba(30, 41, 59, 0.7)',
+                  border: '1px solid rgba(245, 158, 11, 0.35)',
+                  borderRadius: 6,
+                  padding: '8px 10px',
+                  fontSize: '0.74rem',
+                  lineHeight: 1.45,
+                }}
+              >
+                <div style={{ color: '#fbbf24', fontWeight: 600 }}>
+                  📜 Sanketa Nidhi 6.102 / Alt BPHS 26: {vp.name} (in H{vp.houseNumber})
+                </div>
+                <div style={{ color: '#cbd5e1', marginTop: 2 }}>
+                  Under the secondary traditional offset doctrine, retrograde {vp.name} casts special motional influence onto this {house.number}th House. (Core Parashari engine treats this as an alternative school of thought, disabled by default in primary scoring).
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Primary Significations (Karaktwas) */}
       {house.significations && house.significations.length > 0 && (
