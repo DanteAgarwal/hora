@@ -14,6 +14,7 @@ import { fetchExpandedSubPeriods } from '../../services/dashaApi'
 import { DashaCockpit } from './DashaCockpit'
 import { SambhandhaMatrix } from './SambhandhaMatrix'
 import { DashaInspector } from '../inspector/DashaInspector'
+import { useKundliStore } from '../../context/KundliContext'
 
 const safeDateSlice = (d?: string | number | null, len = 10): string => {
   if (typeof d === 'string') return d.slice(0, len)
@@ -21,19 +22,22 @@ const safeDateSlice = (d?: string | number | null, len = 10): string => {
   return '—'
 }
 
-interface DashaTimelineProps {
-  chart: AstroChart
+export interface DashaTimelineProps {
+  chart?: AstroChart
   onSelectPlanet?: (planetName: string) => void
   onSelectHouse?: (houseNumber: number) => void
   onSelectPeriod?: (period: DashaPeriod, chain: DashaChainItem[]) => void
 }
 
-export const DashaTimeline: React.FC<DashaTimelineProps> = ({
-  chart,
-  onSelectPlanet,
-  onSelectHouse,
-  onSelectPeriod,
-}) => {
+export const DashaTimeline: React.FC<DashaTimelineProps> = (props) => {
+  const store = useKundliStore()
+  const chart = props.chart || store.chart
+  if (!chart) return null
+
+  const onSelectPlanet = props.onSelectPlanet ?? store.selectPlanet
+  const onSelectHouse = props.onSelectHouse ?? store.selectHouse
+  const onSelectPeriod = props.onSelectPeriod ?? store.selectDashaPeriod
+
   const nowMs = useNow(30000)
 
   // 6-Level Hierarchy Selection State (initialized lazily to avoid cascading mount renders)

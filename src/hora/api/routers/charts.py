@@ -15,9 +15,17 @@ from hora.api.models import (
 )
 from hora.api.models_reference import VargaCatalogOut
 from hora.api.schemas import ChartRequest, VargaRequest
-from hora.services import chart_service, reference_service
+from hora.services import chart_service, master_chart_service, reference_service
 
 router = APIRouter(prefix="/v1/chart", tags=["charts"])
+
+
+@router.post("/master",
+             summary="Complete Vedic Kundli master assembly in one single call")
+def master_chart(req: ChartRequest) -> dict:
+    return master_chart_service.compute_master_chart(
+        to_instant(req), to_place(req), req.settings
+    )
 
 
 @router.post("/rasi", response_model=RasiChartOut,

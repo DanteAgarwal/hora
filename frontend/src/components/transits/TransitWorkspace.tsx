@@ -3,20 +3,24 @@ import type { AstroChart, LiveGocharaResult } from '../../types/astro'
 import { DualWheelChart } from './DualWheelChart'
 import { SadeSatiCard } from './SadeSatiCard'
 import { TransitAshtakavargaTable } from './TransitAshtakavargaTable'
+import { useKundliStore } from '../../context/KundliContext'
 
-interface TransitWorkspaceProps {
-  chart: AstroChart
+export interface TransitWorkspaceProps {
+  chart?: AstroChart
   selectedPlanet?: string
   selectedHouse?: number
   onSelectPlanet?: (planetName: string) => void
   onSelectHouse?: (houseNumber: number) => void
 }
 
-export const TransitWorkspace: React.FC<TransitWorkspaceProps> = ({
-  chart,
-  selectedPlanet,
-  onSelectPlanet,
-}) => {
+export const TransitWorkspace: React.FC<TransitWorkspaceProps> = (props) => {
+  const store = useKundliStore()
+  const chart = props.chart || store.chart
+  if (!chart) return null
+
+  const selectedPlanet = props.selectedPlanet ?? store.selectedPlanet
+  const onSelectPlanet = props.onSelectPlanet ?? store.selectPlanet
+
   const [transitDate, setTransitDate] = useState<string>(() => {
     const now = new Date()
     return now.toISOString().slice(0, 16) // YYYY-MM-DDTHH:mm

@@ -4,7 +4,7 @@ const fs = require('fs')
 const path = require('path')
 const { DatabaseSync } = require('node:sqlite')
 
-const { buildEnrichedChart } = require('./services/chartBuilder')
+const { buildEnrichedChart, buildChartFromMaster } = require('./services/chartBuilder')
 const {
   normalizeDashaTreeNode,
   expandDashaSubPeriodsBackend,
@@ -71,8 +71,15 @@ async function horaFetch(urlPath, body) {
   return response.json()
 }
 
-/** Compute all chart components with graceful fallbacks for optional sub-calculations. */
+/** Compute all chart components via Python Hora Master Engine with fallback. */
 async function computeChart(name, birthData) {
+  try {
+    const master = await horaFetch('/v1/chart/master', birthData)
+    return buildChartFromMaster(name, birthData, master)
+  } catch (masterErr) {
+    console.warn('[computeChart] Master calculation endpoint failed, falling back to granular calls:', masterErr.message)
+  }
+
   const [rasiResult, panchangaResult, dashaResult, vargaResult, shodasavargaResult] = await Promise.allSettled([
     horaFetch('/v1/chart/rasi', birthData),
     horaFetch('/v1/panchanga', birthData),
@@ -669,25 +676,80 @@ app.post('/api/transits/live', async (req, res) => {
     }
     const tzName = tz_name || natalChart.birthData?.tz_name || 'Asia/Kolkata'
 
-    // Fetch live sidereal planetary positions from Hora Swiss Ephemeris engine
-    const transitRasi = await horaFetch('/v1/chart/rasi', {
-      year: tDate.getFullYear(),
-      month: tDate.getMonth() + 1,
-      day: tDate.getDate(),
-      hour: tDate.getHours(),
-      minute: tDate.getMinutes(),
-      second: tDate.getSeconds(),
-      tz_name: tzName,
-      place: {
-        name: targetPlace.name || 'Current Location',
+    // Extract natal Moon and Lagna from natalChart
+    const natalMoon = (natalChart.planets || []).find((p) => p.name === 'Moon')
+    const natalMoonLon = natalMoon?.longitude ?? 0
+    let natalLagnaSignIdx = 0
+    if (natalChart.quickFacts?.lagna) {
+      natalLagnaSignIdx = parseSignIndex(natalChart.quickFacts.lagna)
+    } else if (natalChart.houses?.[0]?.signNumber) {
+      natalLagnaSignIdx = natalChart.houses[0].signNumber - 1
+    }
+
+    // Build natal BAV map if available
+    const natalBavMap = {}
+    if (natalChart.ashtakavarga?.bav) {
+      for (const [pName, bavRow] of Object.entries(natalChart.ashtakavarga.bav)) {
+        natalBavMap[pName] = Array.isArray(bavRow) ? bavRow : (bavRow.scores || bavRow.rekhas || [])
+      }
+    }
+
+    // Primary: Compute full Gochara, Vedha, Sade Sati & Ashtakavarga directly via Python Swiss Ephemeris kernel
+    try {
+      const transitReport = await horaFetch('/v1/transits/analysis', {
+        natal_moon_longitude: natalMoonLon,
+        natal_lagna_rasi: natalLagnaSignIdx,
+        natal_bav: natalBavMap,
+        transit_year: tDate.getFullYear(),
+        transit_month: tDate.getMonth() + 1,
+        transit_day: tDate.getDate(),
+        transit_hour: tDate.getHours(),
+        transit_minute: tDate.getMinutes(),
+        transit_second: tDate.getSeconds(),
+        transit_tz: tzName,
         latitude: Number(targetPlace.latitude) || 28.6139,
         longitude: Number(targetPlace.longitude) || 77.2090,
-        altitude: Number(targetPlace.altitude) || 0,
-      },
-    })
+      })
 
-    const report = buildLiveGocharaReport(transitRasi, natalChart, tDate, targetPlace)
-    return res.json(report)
+      // Attach client overlay metadata
+      transitReport.natalChart = {
+        name: natalChart.name,
+        date: natalChart.date,
+        lagna: natalChart.lagna,
+        moon: natalChart.moon,
+        planets: (natalChart.planets || []).map((p) => ({
+          name: p.name,
+          symbol: p.symbol,
+          sign: p.sign,
+          signIndex: p.signIndex,
+          dms: p.dms,
+          houseNumber: p.houseNumber,
+        })),
+      }
+      transitReport.targetPlace = targetPlace
+      return res.json(transitReport)
+    } catch (transitErr) {
+      console.warn('[Transit API] Python transit service fallback:', transitErr.message)
+      // Fallback to local gateway Gochara engine
+      const transitRasi = await horaFetch('/v1/chart/rasi', {
+        year: tDate.getFullYear(),
+        month: tDate.getMonth() + 1,
+        day: tDate.getDate(),
+        hour: tDate.getHours(),
+        minute: tDate.getMinutes(),
+        second: tDate.getSeconds(),
+        tz_name: tzName,
+        place: {
+          name: targetPlace.name || 'Current Location',
+          latitude: Number(targetPlace.latitude) || 28.6139,
+          longitude: Number(targetPlace.longitude) || 77.2090,
+          altitude: Number(targetPlace.altitude) || 0,
+        },
+      })
+
+      const report = buildLiveGocharaReport(transitRasi, natalChart, tDate, targetPlace)
+      return res.json(report)
+    }
   } catch (err) {
     console.error('[Transits API Error]', err)
     return res.status(err.status || 500).json({ error: err.message || 'Failed to compute live transits' })

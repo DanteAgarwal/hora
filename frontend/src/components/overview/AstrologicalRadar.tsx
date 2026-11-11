@@ -1,23 +1,27 @@
 import React from 'react'
 import type { AstroChart } from '../../types/astro'
+import { useKundliStore } from '../../context/KundliContext'
 
-interface AstrologicalRadarProps {
-  chart: AstroChart
-  tableTab: 'planets' | 'houses'
-  onSelectTableTab: (tab: 'planets' | 'houses') => void
+export interface AstrologicalRadarProps {
+  chart?: AstroChart
+  tableTab?: 'planets' | 'houses'
+  onSelectTableTab?: (tab: 'planets' | 'houses') => void
   onSelectPlanet?: (planetName: string) => void
   onSelectHouse?: (houseNumber: number) => void
   onNavigateToNav?: (navKey: 'Charts' | 'Timing' | 'Analysis' | 'Research' | 'Learn') => void
 }
 
-export const AstrologicalRadar: React.FC<AstrologicalRadarProps> = ({
-  chart,
-  tableTab,
-  onSelectTableTab,
-  onSelectPlanet,
-  onSelectHouse,
-  onNavigateToNav,
-}) => {
+export const AstrologicalRadar: React.FC<AstrologicalRadarProps> = (props) => {
+  const store = useKundliStore()
+  const chart = props.chart || store.chart
+  if (!chart) return null
+
+  const tableTab = props.tableTab ?? store.tableTab
+  const onSelectTableTab = props.onSelectTableTab ?? store.setTableTab
+  const onSelectPlanet = props.onSelectPlanet ?? store.selectPlanet
+  const onSelectHouse = props.onSelectHouse ?? store.selectHouse
+  const onNavigateToNav = props.onNavigateToNav ?? ((nav) => store.setSelectedNav(nav))
+
   const { planets, panchanga } = chart
 
   // Categorize planets by house groups

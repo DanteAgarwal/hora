@@ -3,9 +3,10 @@ import type { AstroChart, PlanetPosition } from '../../types/astro'
 import { ZODIAC_SIGNS } from '../../types/astro'
 import { useNow } from '../../hooks/useNow'
 import { parseDateMs } from '../timing/dashaUtils'
+import { useKundliStore } from '../../context/KundliContext'
 
-interface VedicCockpitProps {
-  chart: AstroChart
+export interface VedicCockpitProps {
+  chart?: AstroChart
   onSelectPlanet?: (planetName: string) => void
   onSelectHouse?: (houseNumber: number) => void
   onNavigateToAnalysis?: () => void
@@ -24,14 +25,21 @@ const KARAKA_META: { code: string; label: string; meaning: string; color: string
   { code: 'DK',  label: 'Dāra',    meaning: 'Spouse & Partnership',  color: '#a78bfa' },
 ]
 
-export const VedicCockpit: React.FC<VedicCockpitProps> = ({
-  chart,
-  onSelectPlanet,
-  onSelectHouse,
-  onNavigateToAnalysis,
-  onNavigateToTiming,
-  onNavigateToTransits,
-}) => {
+export const VedicCockpit: React.FC<VedicCockpitProps> = (props) => {
+  const store = useKundliStore()
+  const chart = props.chart || store.chart
+  if (!chart) return null
+
+  const onSelectPlanet = props.onSelectPlanet ?? store.selectPlanet
+  const onSelectHouse = props.onSelectHouse ?? store.selectHouse
+  const onNavigateToAnalysis = props.onNavigateToAnalysis ?? (() => store.setSelectedNav('Analysis'))
+  const onNavigateToTiming = props.onNavigateToTiming ?? (() => {
+    store.setSelectedNav('Timing')
+    store.setInspectorTab('dasha')
+    store.setIsInspectorOpen(true)
+  })
+  const onNavigateToTransits = props.onNavigateToTransits ?? (() => store.setSelectedNav('Transits'))
+
   const now = useNow(30000)
   const { quickFacts, metadata, panchanga, planets, houses, yogas } = chart
 
@@ -212,7 +220,7 @@ export const VedicCockpit: React.FC<VedicCockpitProps> = ({
       <article
         className="cockpit-card timing-card panel"
         onClick={onNavigateToTiming}
-        style={{ cursor: onNavigateToTiming ? 'pointer' : 'default' }}
+        style={{ cursor: 'pointer' }}
         title="Click to view full 6-Level Dasha Timeline"
       >
         <div className="cockpit-header">

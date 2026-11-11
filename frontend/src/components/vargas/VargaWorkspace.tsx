@@ -4,9 +4,10 @@ import { VARGA_CATALOG, type VargaInfo } from '../../data/vargaData'
 import { VedicChart } from '../chart/VedicChart'
 import { VargaComparison } from './VargaComparison'
 import { ZODIAC_SIGNS } from '../../types/astro'
+import { useKundliStore } from '../../context/KundliContext'
 
-interface VargaWorkspaceProps {
-  chart: AstroChart
+export interface VargaWorkspaceProps {
+  chart?: AstroChart
   selectedPlanet?: string
   selectedHouse?: number
   onSelectPlanet?: (planetName: string) => void
@@ -17,13 +18,16 @@ type WorkspaceViewMode = 'comparison' | 'explorer'
 type CategoryFilter = 'all' | 'Shadvarga' | 'Saptavarga' | 'Dashavarga' | 'Shodasavarga'
 type TableFilter = 'all' | 'vargottama' | 'dignified' | 'debilitated'
 
-export const VargaWorkspace: React.FC<VargaWorkspaceProps> = ({
-  chart,
-  selectedPlanet,
-  selectedHouse,
-  onSelectPlanet,
-  onSelectHouse,
-}) => {
+export const VargaWorkspace: React.FC<VargaWorkspaceProps> = (props) => {
+  const store = useKundliStore()
+  const chart = props.chart || store.chart
+  if (!chart) return null
+
+  const selectedPlanet = props.selectedPlanet ?? store.selectedPlanet
+  const selectedHouse = props.selectedHouse ?? store.selectedHouse
+  const onSelectPlanet = props.onSelectPlanet ?? store.selectPlanet
+  const onSelectHouse = props.onSelectHouse ?? store.selectHouse
+
   const [viewMode, setViewMode] = useState<WorkspaceViewMode>('explorer')
   const [selectedVargaCode, setSelectedVargaCode] = useState<string>('D9')
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all')

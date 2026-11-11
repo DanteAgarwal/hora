@@ -69,6 +69,10 @@ const {
   computeShadbala,
 } = require('./shadbalaService')
 
+const {
+  computeAllSpecialPoints,
+} = require('./specialPointsService')
+
 /**
  * Normalizes classical planetary yogas from the Hora API
  */
@@ -508,6 +512,58 @@ function buildEnrichedChart(
   }
 }
 
+/**
+ * Builds the complete AstroChart domain model directly from Python's single master calculation
+ */
+function buildChartFromMaster(name, birthData, master) {
+  if (!master || !master.chart) {
+    throw new Error('Invalid master chart payload returned by Python Hora engine')
+  }
+
+  const chart = buildEnrichedChart(
+    name,
+    birthData,
+    master.chart,
+    master.panchanga,
+    master.dashas,
+    null,
+    master.vargas,
+    master.aspects,
+    master.yogas,
+    null,
+    master.arudhas,
+    master.baadhakas,
+    master.marakas,
+    master.ashtakavarga,
+    master.argala,
+    master.functional_nature,
+    master.vakri_analysis,
+    master.special_lagnas,
+    master.upagrahas
+  )
+
+  // Align canonical Chara Karakas directly from Python calculation engine
+  if (Array.isArray(master.chara_karakas) && master.chara_karakas.length > 0) {
+    master.chara_karakas.forEach((ck) => {
+      const pl = chart.planets.find((p) => p.name === ck.graha_name || p.id === ck.graha)
+      if (pl) {
+        pl.charaKaraka = `${ck.name} (${ck.symbol})`
+        pl.charaKarakaCode = ck.symbol
+        pl.charaKarakaRank = ck.order
+        pl.isAtmakaraka = ck.symbol === 'AK'
+      }
+    })
+  }
+
+  // Authoritative Purushartha balance from Python
+  if (master.purushartha) {
+    chart.purusharthaBalance = master.purushartha
+  }
+
+  return chart
+}
+
 module.exports = {
   buildEnrichedChart,
+  buildChartFromMaster,
 }

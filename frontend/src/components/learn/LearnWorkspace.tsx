@@ -3,22 +3,25 @@ import type { AstroChart } from '../../types/astro'
 import { ConceptsExplorer } from './ConceptsExplorer'
 import { GlossaryViewer } from './GlossaryViewer'
 import { YogasEncyclopedia } from './YogasEncyclopedia'
+import { useKundliStore } from '../../context/KundliContext'
 
-interface LearnWorkspaceProps {
-  chart: AstroChart
+export interface LearnWorkspaceProps {
+  chart?: AstroChart
   initialTab?: 'concepts' | 'glossary' | 'yogas'
   initialTermId?: string
   onSelectPlanet?: (planetName: string) => void
   onSelectHouse?: (houseNumber: number) => void
 }
 
-export const LearnWorkspace: React.FC<LearnWorkspaceProps> = ({
-  chart,
-  initialTab = 'concepts',
-  initialTermId,
-  onSelectPlanet,
-  onSelectHouse,
-}) => {
+export const LearnWorkspace: React.FC<LearnWorkspaceProps> = (props) => {
+  const store = useKundliStore()
+  const chart = props.chart || store.chart
+  if (!chart) return null
+
+  const initialTab = props.initialTab || 'concepts'
+  const initialTermId = props.initialTermId
+  const onSelectPlanet = props.onSelectPlanet ?? store.selectPlanet
+  const onSelectHouse = props.onSelectHouse ?? store.selectHouse
   const [activeTab, setActiveTab] = useState<'concepts' | 'glossary' | 'yogas'>(initialTab)
   const [selectedTermId, setSelectedTermId] = useState<string | undefined>(initialTermId)
 

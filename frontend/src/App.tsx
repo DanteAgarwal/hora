@@ -1,198 +1,128 @@
-import { useEffect, useState, useCallback } from 'react'
+import { Suspense, lazy } from 'react'
 import './App.css'
-import type { AstroChart, BirthData, DashaPeriod } from './types/astro'
-import type { DashaChainItem } from './components/timing/dashaUtils'
-import { normalizeChartPayload } from './adapters/horaAdapter'
+import {
+  KundliProvider,
+  useKundliStore,
+  navItems,
+  fetchJsonWithRetry,
+  DEFAULT_BIRTH,
+} from './context/KundliContext'
 import { VedicChart } from './components/chart/VedicChart'
 import { UniversalInspector } from './components/inspector/UniversalInspector'
-import { VargaWorkspace } from './components/vargas/VargaWorkspace'
-import { DashaTimeline } from './components/timing/DashaTimeline'
-import { TransitWorkspace } from './components/transits/TransitWorkspace'
-import { AnalysisWorkspace } from './components/analysis/AnalysisWorkspace'
-import { ResearchWorkspace } from './components/research/ResearchWorkspace'
-import { LearnWorkspace } from './components/learn/LearnWorkspace'
-import { ContextualHelpModal } from './components/learn/ContextualHelpModal'
-import { CreateChartModal } from './components/modals/CreateChartModal'
 import { VedicCockpit } from './components/overview/VedicCockpit'
 import { AstrologicalRadar } from './components/overview/AstrologicalRadar'
 import { TechnicalTables } from './components/overview/TechnicalTables'
 import type { CalculationSettingsConfig } from './components/research/ConfigurationPanel'
 
 // ---------------------------------------------------------------------------
-// Types & Constants
+// Route & Tab Code-Splitting: Lazy-Loaded Heavy Workspaces
 // ---------------------------------------------------------------------------
 
-type NavKey = 'Overview' | 'Charts' | 'Timing' | 'Transits' | 'Analysis' | 'Research' | 'Learn'
+const VargaWorkspace = lazy(() =>
+  import('./components/vargas/VargaWorkspace').then((m) => ({ default: m.VargaWorkspace })),
+)
+const DashaTimeline = lazy(() =>
+  import('./components/timing/DashaTimeline').then((m) => ({ default: m.DashaTimeline })),
+)
+const TransitWorkspace = lazy(() =>
+  import('./components/transits/TransitWorkspace').then((m) => ({ default: m.TransitWorkspace })),
+)
+const AnalysisWorkspace = lazy(() =>
+  import('./components/analysis/AnalysisWorkspace').then((m) => ({ default: m.AnalysisWorkspace })),
+)
+const ResearchWorkspace = lazy(() =>
+  import('./components/research/ResearchWorkspace').then((m) => ({ default: m.ResearchWorkspace })),
+)
+const LearnWorkspace = lazy(() =>
+  import('./components/learn/LearnWorkspace').then((m) => ({ default: m.LearnWorkspace })),
+)
+const CreateChartModal = lazy(() =>
+  import('./components/modals/CreateChartModal').then((m) => ({ default: m.CreateChartModal })),
+)
+const ContextualHelpModal = lazy(() =>
+  import('./components/learn/ContextualHelpModal').then((m) => ({ default: m.ContextualHelpModal })),
+)
 
-const navItems: NavKey[] = ['Overview', 'Charts', 'Timing', 'Transits', 'Analysis', 'Research', 'Learn']
+// ---------------------------------------------------------------------------
+// Workspace Skeleton Loader (Suspense Fallback)
+// ---------------------------------------------------------------------------
 
-const DEFAULT_BIRTH: BirthData = {
-  name: 'Sample Natal (Agra)',
-  year: 1995,
-  month: 8,
-  day: 24,
-  hour: 10,
-  minute: 30,
-  second: 0,
-  tz_name: 'Asia/Kolkata',
-  place: {
-    latitude: 27.1767,
-    longitude: 78.0081,
-    name: 'Agra',
-  },
+function WorkspaceSkeleton({ title }: { title?: string }) {
+  return (
+    <div
+      className="panel workspace-skeleton"
+      style={{
+        padding: '32px 24px',
+        minHeight: 380,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 16,
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ width: 140, height: 16, background: 'rgba(148, 163, 184, 0.15)', borderRadius: 4 }} />
+        <div style={{ width: 80, height: 16, background: 'rgba(148, 163, 184, 0.15)', borderRadius: 4 }} />
+      </div>
+      <div style={{ width: '40%', height: 24, background: 'rgba(217, 119, 6, 0.2)', borderRadius: 4 }} />
+      <div style={{ width: '70%', height: 14, background: 'rgba(148, 163, 184, 0.1)', borderRadius: 4 }} />
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gap: 16,
+          marginTop: 12,
+        }}
+      >
+        <div
+          style={{
+            height: 180,
+            background: 'rgba(30, 41, 59, 0.6)',
+            borderRadius: 8,
+            border: '1px solid rgba(148, 163, 184, 0.1)',
+          }}
+        />
+        <div
+          style={{
+            height: 180,
+            background: 'rgba(30, 41, 59, 0.6)',
+            borderRadius: 8,
+            border: '1px solid rgba(148, 163, 184, 0.1)',
+          }}
+        />
+      </div>
+      <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem', marginTop: 16 }}>
+        Loading {title || 'workspace'}...
+      </p>
+    </div>
+  )
 }
 
-async function fetchJsonWithRetry(path: string, init?: RequestInit) {
-  let lastError: Error | null = null
-
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    let response: Response
-    try {
-      response = await fetch(path, init)
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error('Network request failed')
-      if (attempt < 2) {
-        await new Promise((resolve) => window.setTimeout(resolve, 400 * (attempt + 1)))
-        continue
-      }
-      throw lastError
-    }
-
-    if (response.ok) return response.json()
-
-    const detail = await response.json().catch(() => null)
-    lastError = new Error(
-      detail?.detail ?? detail?.error ?? `API request failed (${response.status})`,
-    )
-    if (response.status < 500 || attempt === 2) throw lastError
-    await new Promise((resolve) => window.setTimeout(resolve, 400 * (attempt + 1)))
-  }
-
-  throw lastError ?? new Error('API request failed')
-}
-
 // ---------------------------------------------------------------------------
-// App
+// Main App Workspace Shell (Reads from Centralized Kundli Store)
 // ---------------------------------------------------------------------------
 
-function App() {
-  const [selectedNav, setSelectedNav] = useState<NavKey>('Overview')
-  const [selectedPlanet, setSelectedPlanet] = useState<string>('Sun')
-  const [selectedHouse, setSelectedHouse] = useState<number>(1)
-  const [selectedDashaPeriod, setSelectedDashaPeriod] = useState<DashaPeriod | null>(null)
-  const [dashaHierarchyChain, setDashaHierarchyChain] = useState<DashaChainItem[]>([])
-  const [inspectorTab, setInspectorTab] = useState<'planet' | 'house' | 'dasha'>('planet')
-  const [tableTab, setTableTab] = useState<'planets' | 'houses'>('planets')
-  const [chart, setChart] = useState<AstroChart | null>(null)
-  const [savedCharts, setSavedCharts] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [helpTermId, setHelpTermId] = useState<string | null>(null)
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline'>('checking')
-
-  const handleSelectPlanet = useCallback((pName: string) => {
-    setSelectedPlanet(pName)
-    setInspectorTab('planet')
-  }, [])
-
-  const handleSelectHouse = useCallback((hNum: number) => {
-    setSelectedHouse(hNum)
-    setInspectorTab('house')
-  }, [])
-
-  const handleSelectPeriod = useCallback((period: DashaPeriod, chain?: DashaChainItem[]) => {
-    setSelectedDashaPeriod(period)
-    if (chain) setDashaHierarchyChain(chain)
-    setInspectorTab('dasha')
-  }, [])
-
-  // Check backend health on mount
-  useEffect(() => {
-    const checkHealth = async () => {
-      try {
-        const health = await fetchJsonWithRetry('/api/health')
-        setBackendStatus(health.hora_status === 'ok' ? 'online' : 'offline')
-      } catch {
-        setBackendStatus('offline')
-      }
-    }
-    void checkHealth()
-  }, [])
-
-  // Apply a chart to active state and persist selection
-  const applyChart = (targetChart: any) => {
-    const normalized = normalizeChartPayload(targetChart)
-    setChart(normalized)
-    setSelectedPlanet(normalized.planets[0]?.name ?? 'Sun')
-    setSelectedHouse(1)
-    if (targetChart.id) {
-      localStorage.setItem('hora_active_chart_id', String(targetChart.id))
-    }
-  }
-
-  // Load initial chart on mount: checks database first, then localStorage, then default
-  useEffect(() => {
-    const initApp = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-
-        // 1. Fetch saved charts from backend database
-        let savedList: any[] = []
-        try {
-          savedList = await fetchJsonWithRetry('/api/charts')
-          setSavedCharts(savedList)
-        } catch {
-          savedList = []
-        }
-
-        // 2. Determine which chart to display
-        const storedId = localStorage.getItem('hora_active_chart_id')
-        const matched = storedId ? savedList.find((c) => String(c.id) === storedId) : null
-        const targetChart = matched || (savedList.length > 0 ? savedList[0] : null)
-
-        if (targetChart) {
-          applyChart(targetChart)
-        } else {
-          // If no charts exist in database yet, compute default natal chart (Agra)
-          const computed = await fetchJsonWithRetry('/api/compute', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(DEFAULT_BIRTH),
-          })
-          applyChart({ ...computed, name: computed.name ?? DEFAULT_BIRTH.name, birthData: DEFAULT_BIRTH })
-        }
-      } catch (loadError) {
-        console.error(loadError)
-        const detail = loadError instanceof Error ? loadError.message : 'Unknown error'
-        setError(`${detail}. Make sure both the Node server (port 4000) and the Hora Python API (port 8000) are running.`)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    void initApp()
-  }, [])
-
-  // Recalculate currently active chart without reloading the page
-  const handleRecalculateCurrent = async () => {
-    if (!chart) return
-    const birth = chart.birthData || DEFAULT_BIRTH
-    try {
-      setLoading(true)
-      const computed = await fetchJsonWithRetry('/api/compute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(birth),
-      })
-      applyChart({ ...computed, id: chart.id, name: chart.name, birthData: birth })
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setLoading(false)
-    }
-  }
+function AppShell() {
+  const {
+    selectedNav,
+    setSelectedNav,
+    selectedPlanet,
+    selectedHouse,
+    inspectorTab,
+    setIsInspectorOpen,
+    chart,
+    savedCharts,
+    setSavedCharts,
+    loading,
+    setLoading,
+    error,
+    backendStatus,
+    applyChart,
+    recalculateCurrent,
+    showCreateModal,
+    setShowCreateModal,
+    helpTermId,
+    setHelpTermId,
+  } = useKundliStore()
 
   // Recalculate chart with updated engine calculation parameters (PRD §20)
   const handleApplySettings = async (newSettings: CalculationSettingsConfig) => {
@@ -269,6 +199,7 @@ function App() {
 
   return (
     <div className="app-shell">
+      {/* Primary Sidebar Navigation */}
       <aside className="sidebar panel">
         <div className="brand-box">
           <div className="brand-mark">K</div>
@@ -286,14 +217,25 @@ function App() {
               className={selectedNav === item ? 'nav-item active' : 'nav-item'}
               onClick={() => {
                 setSelectedNav(item)
-                if (item === 'Timing') {
-                  setInspectorTab('dasha')
-                }
               }}
             >
               <span>{item}</span>
               <span className="nav-count">
-                {item === 'Overview' ? '01' : item === 'Charts' ? String(savedCharts.length).padStart(2, '0') : item === 'Timing' ? '03' : item === 'Transits' ? '🪐' : item === 'Analysis' ? '04' : item === 'Research' ? '05' : item === 'Learn' ? '02' : '—'}
+                {item === 'Overview'
+                  ? '01'
+                  : item === 'Charts'
+                  ? String(savedCharts.length).padStart(2, '0')
+                  : item === 'Timing'
+                  ? '03'
+                  : item === 'Transits'
+                  ? '🪐'
+                  : item === 'Analysis'
+                  ? '04'
+                  : item === 'Research'
+                  ? '05'
+                  : item === 'Learn'
+                  ? '02'
+                  : '—'}
               </span>
             </button>
           ))}
@@ -303,11 +245,16 @@ function App() {
           <p className="eyebrow">System status</p>
           <strong>Hora API</strong>
           <span className={backendStatus === 'online' ? 'status-online' : 'status-offline'}>
-            {backendStatus === 'online' ? '● Connected' : backendStatus === 'checking' ? '◌ Checking...' : '○ Disconnected'}
+            {backendStatus === 'online'
+              ? '● Connected'
+              : backendStatus === 'checking'
+              ? '◌ Checking...'
+              : '○ Disconnected'}
           </span>
         </div>
       </aside>
 
+      {/* Main Analysis Workspace */}
       <main className="workspace">
         <header className="topbar panel">
           <div>
@@ -335,33 +282,27 @@ function App() {
           </div>
 
           <div className="topbar-actions">
+            <button
+              type="button"
+              className="ghost-button mobile-inspect-btn"
+              onClick={() => setIsInspectorOpen(true)}
+              title="Open Object Inspector"
+            >
+              🔍 Inspect
+            </button>
             <button type="button" className="ghost-button" onClick={() => setShowCreateModal(true)}>
               + Cast New Chart
             </button>
-            <button type="button" className="primary-button" onClick={handleRecalculateCurrent} disabled={loading}>
+            <button type="button" className="primary-button" onClick={recalculateCurrent} disabled={loading}>
               {loading ? 'Calculating...' : 'Recalculate'}
             </button>
           </div>
         </header>
 
-        <VedicCockpit
-          chart={chart}
-          onSelectPlanet={(pName) => {
-            setSelectedPlanet(pName)
-            setInspectorTab('planet')
-          }}
-          onSelectHouse={(hNum) => {
-            setSelectedHouse(hNum)
-            setInspectorTab('house')
-          }}
-          onNavigateToAnalysis={() => setSelectedNav('Analysis')}
-          onNavigateToTiming={() => {
-            setSelectedNav('Timing')
-            setInspectorTab('dasha')
-          }}
-          onNavigateToTransits={() => setSelectedNav('Transits')}
-        />
+        {/* Central Vedic Cockpit - Reads directly from store */}
+        <VedicCockpit />
 
+        {/* 1. Overview Tab */}
         {selectedNav === 'Overview' && (
           <>
             <section className="main-panel panel">
@@ -378,208 +319,156 @@ function App() {
 
               <div className="chart-layout">
                 <div className="chart-board" style={{ padding: 0, background: 'transparent', border: 'none' }}>
-                  <VedicChart
-                    chart={chart}
-                    selectedPlanet={selectedPlanet}
-                    selectedHouse={selectedHouse}
-                    defaultStyle="north"
-                    onSelectPlanet={(pName) => {
-                      setSelectedPlanet(pName)
-                      setInspectorTab('planet')
-                    }}
-                    onSelectHouse={(hNum) => {
-                      setSelectedHouse(hNum)
-                      setInspectorTab('house')
-                    }}
-                  />
+                  <VedicChart defaultStyle="north" />
                 </div>
-
-                <AstrologicalRadar
-                  chart={chart}
-                  tableTab={tableTab}
-                  onSelectTableTab={(tab) => {
-                    setTableTab(tab)
-                    setInspectorTab(tab === 'planets' ? 'planet' : 'house')
-                  }}
-                  onSelectPlanet={(pName) => {
-                    setSelectedPlanet(pName)
-                    setInspectorTab('planet')
-                  }}
-                  onSelectHouse={(hNum) => {
-                    setSelectedHouse(hNum)
-                    setInspectorTab('house')
-                  }}
-                  onNavigateToNav={(nav) => setSelectedNav(nav)}
-                />
+                <AstrologicalRadar />
               </div>
             </section>
 
-            <TechnicalTables
-              chart={chart}
-              tableTab={tableTab}
-              selectedPlanet={selectedPlanet}
-              selectedHouse={selectedHouse}
-              onSelectTableTab={(tab) => {
-                setTableTab(tab)
-                setInspectorTab(tab === 'planets' ? 'planet' : 'house')
-              }}
-              onSelectPlanet={(pName) => {
-                setSelectedPlanet(pName)
-                setInspectorTab('planet')
-              }}
-              onSelectHouse={(hNum) => {
-                setSelectedHouse(hNum)
-                setInspectorTab('house')
-              }}
-            />
+            <TechnicalTables />
           </>
         )}
 
+        {/* 2. Charts / Vargas Tab (Lazy-Loaded) */}
         {selectedNav === 'Charts' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            <VargaWorkspace
-              chart={chart}
-              selectedPlanet={selectedPlanet}
-              selectedHouse={selectedHouse}
-              onSelectPlanet={(pName) => {
-                setSelectedPlanet(pName)
-                setInspectorTab('planet')
-              }}
-              onSelectHouse={(hNum) => {
-                setSelectedHouse(hNum)
-                setInspectorTab('house')
-              }}
-            />
+          <Suspense fallback={<WorkspaceSkeleton title="Varga Divisional Charts" />}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <VargaWorkspace />
 
-            {savedCharts.length > 0 && (
-              <section className="panel" style={{ marginTop: 8 }}>
-                <div className="section-header">
-                  <h3>Saved Charts Archive</h3>
-                  <span className="eyebrow">{savedCharts.length} saved</span>
-                </div>
-                <div className="saved-charts-list">
-                  {savedCharts.map((sc) => {
-                    const isActive = chart.id === sc.id
-                    return (
-                      <div
-                        key={sc.id}
-                        className={`saved-chart-row ${isActive ? 'active-chart' : ''}`}
-                        onClick={() => {
-                          applyChart(sc)
-                          setSelectedNav('Overview')
-                        }}
-                        title="Click to view this Kundli chart in Overview"
-                      >
-                        <div>
-                          <strong>{sc.name}</strong> {isActive && <span className="active-tag">● Active</span>}
+              {savedCharts.length > 0 && (
+                <section className="panel" style={{ marginTop: 8 }}>
+                  <div className="section-header">
+                    <h3>Saved Charts Archive</h3>
+                    <span className="eyebrow">{savedCharts.length} saved</span>
+                  </div>
+                  <div className="saved-charts-list">
+                    {savedCharts.map((sc) => {
+                      const isActive = chart.id === sc.id
+                      return (
+                        <div
+                          key={sc.id}
+                          className={`saved-chart-row ${isActive ? 'active-chart' : ''}`}
+                          onClick={() => {
+                            applyChart(sc)
+                            setSelectedNav('Overview')
+                          }}
+                          title="Click to view this Kundli chart in Overview"
+                        >
+                          <div>
+                            <strong>{sc.name}</strong> {isActive && <span className="active-tag">● Active</span>}
+                          </div>
+                          <span>📍 {sc.location || sc.birthData?.place?.name || '—'}</span>
+                          <span>🕉️ Lagna: {sc.lagna || '—'}</span>
                         </div>
-                        <span>📍 {sc.location || sc.birthData?.place?.name || '—'}</span>
-                        <span>🕉️ Lagna: {sc.lagna || '—'}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </section>
-            )}
-          </div>
+                      )
+                    })}
+                  </div>
+                </section>
+              )}
+            </div>
+          </Suspense>
         )}
 
+        {/* 3. Timing / Dasha Timeline Tab (Lazy-Loaded) */}
         {selectedNav === 'Timing' && (
-          <DashaTimeline
-            chart={chart}
-            onSelectPlanet={handleSelectPlanet}
-            onSelectHouse={handleSelectHouse}
-            onSelectPeriod={handleSelectPeriod}
-          />
+          <Suspense fallback={<WorkspaceSkeleton title="Vimshottari Dasha Engine" />}>
+            <DashaTimeline />
+          </Suspense>
         )}
 
+        {/* 4. Transits / Gochara Tab (Lazy-Loaded) */}
         {selectedNav === 'Transits' && (
-          <TransitWorkspace
-            chart={chart}
-            selectedPlanet={selectedPlanet}
-            selectedHouse={selectedHouse}
-            onSelectPlanet={handleSelectPlanet}
-            onSelectHouse={handleSelectHouse}
-          />
+          <Suspense fallback={<WorkspaceSkeleton title="Live Gochara & Sade Sati Tracker" />}>
+            <TransitWorkspace />
+          </Suspense>
         )}
 
+        {/* 5. Analysis / Shadbala & Yogas Tab (Lazy-Loaded) */}
         {selectedNav === 'Analysis' && (
-          <AnalysisWorkspace
-            chart={chart}
-            onSelectPlanet={handleSelectPlanet}
-            onSelectHouse={handleSelectHouse}
-            onNavigateToLearn={() => setSelectedNav('Learn')}
-          />
+          <Suspense fallback={<WorkspaceSkeleton title="Dignity & Shadbala Analysis" />}>
+            <AnalysisWorkspace />
+          </Suspense>
         )}
 
+        {/* 6. Research & Provenance Tab (Lazy-Loaded) */}
         {selectedNav === 'Research' && (
-          <ResearchWorkspace
-            chart={chart}
-            onSelectPlanet={handleSelectPlanet}
-            onSelectHouse={handleSelectHouse}
-            onApplySettings={handleApplySettings}
-            isRecalculating={loading}
-          />
+          <Suspense fallback={<WorkspaceSkeleton title="Research Workbench & Raw Data" />}>
+            <ResearchWorkspace onApplySettings={handleApplySettings} />
+          </Suspense>
         )}
 
+        {/* 7. Learn & Encyclopedia Tab (Lazy-Loaded) */}
         {selectedNav === 'Learn' && (
-          <LearnWorkspace
-            chart={chart}
-            onSelectPlanet={handleSelectPlanet}
-            onSelectHouse={handleSelectHouse}
-          />
+          <Suspense fallback={<WorkspaceSkeleton title="Classical Vedic Encyclopedia" />}>
+            <LearnWorkspace />
+          </Suspense>
         )}
       </main>
 
-      <UniversalInspector
-        chart={chart}
-        selectedPlanetName={selectedPlanet}
-        selectedHouseNumber={selectedHouse}
-        selectedDashaPeriod={selectedDashaPeriod}
-        dashaHierarchyChain={dashaHierarchyChain}
-        activeTab={inspectorTab}
-        onChangeTab={setInspectorTab}
-        onSelectPlanet={(pName) => {
-          setSelectedPlanet(pName)
-          setInspectorTab('planet')
-        }}
-        onSelectHouse={(hNum) => {
-          setSelectedHouse(hNum)
-          setInspectorTab('house')
-        }}
-        onSelectPeriod={(period) => {
-          setSelectedDashaPeriod(period)
-          setInspectorTab('dasha')
-        }}
-        onOpenHelp={setHelpTermId}
-      />
+      {/* Persistent / Responsive Universal Inspector - Reads directly from store */}
+      <UniversalInspector />
 
+      {/* Floating Inspector Trigger Pill for Tablets & Mobile (screen <= 1280px) */}
+      <button
+        type="button"
+        className="floating-inspector-pill"
+        onClick={() => setIsInspectorOpen(true)}
+        title="Open Object Inspector"
+        aria-label="Open Object Inspector"
+      >
+        <span className="pill-dot" />
+        <span className="pill-icon">🔍</span>
+        <span className="pill-label">
+          {inspectorTab === 'planet'
+            ? `${selectedPlanet || 'Planet'}`
+            : inspectorTab === 'house'
+            ? `House ${selectedHouse}`
+            : 'Dasha'}
+        </span>
+        <span className="pill-badge">{inspectorTab}</span>
+      </button>
+
+      {/* Lazy-Loaded Modals */}
       {showCreateModal && (
-        <CreateChartModal
-          onClose={() => setShowCreateModal(false)}
-          onCreated={(newChart) => {
-            setSavedCharts((prev) => [newChart, ...prev.filter((c) => c.id !== newChart.id)])
-            applyChart(newChart)
-            setSelectedNav('Overview')
-            setShowCreateModal(false)
-          }}
-          fetchJsonWithRetry={fetchJsonWithRetry}
-        />
+        <Suspense fallback={null}>
+          <CreateChartModal
+            onClose={() => setShowCreateModal(false)}
+            onCreated={(newChart) => {
+              setSavedCharts((prev) => [newChart, ...prev.filter((c) => c.id !== newChart.id)])
+              applyChart(newChart)
+              setSelectedNav('Overview')
+              setShowCreateModal(false)
+            }}
+            fetchJsonWithRetry={fetchJsonWithRetry}
+          />
+        </Suspense>
       )}
 
       {helpTermId && chart && (
-        <ContextualHelpModal
-          termId={helpTermId}
-          chart={chart}
-          onClose={() => setHelpTermId(null)}
-          onNavigateToGlossary={() => {
-            setHelpTermId(null)
-            setSelectedNav('Learn')
-          }}
-        />
+        <Suspense fallback={null}>
+          <ContextualHelpModal
+            termId={helpTermId}
+            chart={chart}
+            onClose={() => setHelpTermId(null)}
+            onNavigateToGlossary={() => {
+              setHelpTermId(null)
+              setSelectedNav('Learn')
+            }}
+          />
+        </Suspense>
       )}
     </div>
   )
 }
 
-export default App
+// ---------------------------------------------------------------------------
+// Root App with Context Provider Wrapper
+// ---------------------------------------------------------------------------
+
+export default function App() {
+  return (
+    <KundliProvider>
+      <AppShell />
+    </KundliProvider>
+  )
+}

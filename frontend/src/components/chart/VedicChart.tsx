@@ -2,9 +2,10 @@ import React, { useState } from 'react'
 import { NorthIndianChart } from './NorthIndianChart'
 import { SouthIndianChart } from './SouthIndianChart'
 import type { AstroChart, ChartStyle, PlanetPosition, VargaGrahaPlacement } from '../../types/astro'
+import { useKundliStore } from '../../context/KundliContext'
 
-interface VedicChartProps {
-  chart: AstroChart
+export interface VedicChartProps {
+  chart?: AstroChart
   selectedPlanet?: string
   selectedHouse?: number
   defaultStyle?: ChartStyle
@@ -15,17 +16,23 @@ interface VedicChartProps {
   onSelectHouse?: (houseNumber: number) => void
 }
 
-export const VedicChart: React.FC<VedicChartProps> = ({
-  chart,
-  selectedPlanet,
-  selectedHouse,
-  defaultStyle = 'north',
-  forcedVarga,
-  hideVargaSelector = false,
-  title,
-  onSelectPlanet,
-  onSelectHouse,
-}) => {
+export const VedicChart: React.FC<VedicChartProps> = (props) => {
+  const store = useKundliStore()
+  const chart = props.chart || store.chart
+  if (!chart) return null
+
+  const selectedPlanet = props.selectedPlanet ?? store.selectedPlanet
+  const selectedHouse = props.selectedHouse ?? store.selectedHouse
+  const onSelectPlanet = props.onSelectPlanet ?? store.selectPlanet
+  const onSelectHouse = props.onSelectHouse ?? store.selectHouse
+
+  const {
+    defaultStyle = 'north',
+    forcedVarga,
+    hideVargaSelector = false,
+    title,
+  } = props
+
   const [style, setStyle] = useState<ChartStyle>(defaultStyle)
   const [activeVarga, setActiveVarga] = useState<string>(forcedVarga || 'D1')
   const [showDegrees, setShowDegrees] = useState<boolean>(true)

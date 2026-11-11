@@ -9,9 +9,10 @@ import { LongevityMarakasView } from './LongevityMarakasView'
 import { VakriGrahaIntelligenceView } from './VakriGrahaIntelligenceView'
 import { ShadbalaWorkspace } from './ShadbalaWorkspace'
 import { SpecialLagnasWorkspace } from './SpecialLagnasWorkspace'
+import { useKundliStore } from '../../context/KundliContext'
 
-interface AnalysisWorkspaceProps {
-  chart: AstroChart
+export interface AnalysisWorkspaceProps {
+  chart?: AstroChart
   onSelectPlanet?: (planetName: string) => void
   onSelectHouse?: (houseNumber: number) => void
   onNavigateToLearn?: () => void
@@ -19,12 +20,14 @@ interface AnalysisWorkspaceProps {
 
 type AnalysisTab = 'overview' | 'shadbala' | 'specialLagnas' | 'aspects' | 'dignity' | 'vakri' | 'purushartha' | 'yogas' | 'ashtakavarga' | 'longevity'
 
-export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = ({
-  chart,
-  onSelectPlanet,
-  onSelectHouse,
-  onNavigateToLearn,
-}) => {
+export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = (props) => {
+  const store = useKundliStore()
+  const chart = props.chart || store.chart
+  if (!chart) return null
+
+  const onSelectPlanet = props.onSelectPlanet ?? store.selectPlanet
+  const onSelectHouse = props.onSelectHouse ?? store.selectHouse
+  const onNavigateToLearn = props.onNavigateToLearn ?? (() => store.setSelectedNav('Learn'))
   const [activeTab, setActiveTab] = useState<AnalysisTab>('overview')
 
   const yogasCount = chart.yogas?.length || 0

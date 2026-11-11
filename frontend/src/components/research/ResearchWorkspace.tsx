@@ -3,9 +3,10 @@ import type { AstroChart } from '../../types/astro'
 import { RawDataInspector } from './RawDataInspector'
 import { CalculationProvenance } from './CalculationProvenance'
 import { ConfigurationPanel, type CalculationSettingsConfig } from './ConfigurationPanel'
+import { useKundliStore } from '../../context/KundliContext'
 
-interface ResearchWorkspaceProps {
-  chart: AstroChart
+export interface ResearchWorkspaceProps {
+  chart?: AstroChart
   onSelectPlanet?: (planetName: string) => void
   onSelectHouse?: (houseNumber: number) => void
   onApplySettings?: (newSettings: CalculationSettingsConfig) => Promise<void> | void
@@ -14,13 +15,15 @@ interface ResearchWorkspaceProps {
 
 type ResearchTab = 'raw' | 'provenance' | 'config'
 
-export const ResearchWorkspace: React.FC<ResearchWorkspaceProps> = ({
-  chart,
-  onSelectPlanet,
-  onSelectHouse,
-  onApplySettings,
-  isRecalculating = false,
-}) => {
+export const ResearchWorkspace: React.FC<ResearchWorkspaceProps> = (props) => {
+  const store = useKundliStore()
+  const chart = props.chart || store.chart
+  if (!chart) return null
+
+  const onSelectPlanet = props.onSelectPlanet ?? store.selectPlanet
+  const onSelectHouse = props.onSelectHouse ?? store.selectHouse
+  const onApplySettings = props.onApplySettings
+  const isRecalculating = props.isRecalculating ?? store.loading
   const [activeTab, setActiveTab] = useState<ResearchTab>('raw')
 
   return (

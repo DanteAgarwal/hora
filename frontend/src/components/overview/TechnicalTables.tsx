@@ -1,28 +1,32 @@
 import React, { useState, useMemo } from 'react'
 import type { AstroChart } from '../../types/astro'
 import { ZODIAC_SIGNS } from '../../types/astro'
+import { useKundliStore } from '../../context/KundliContext'
 
-interface TechnicalTablesProps {
-  chart: AstroChart
-  tableTab: 'planets' | 'houses'
+export interface TechnicalTablesProps {
+  chart?: AstroChart
+  tableTab?: 'planets' | 'houses'
   selectedPlanet?: string
   selectedHouse?: number
-  onSelectTableTab: (tab: 'planets' | 'houses') => void
-  onSelectPlanet: (planetName: string) => void
-  onSelectHouse: (houseNumber: number) => void
+  onSelectTableTab?: (tab: 'planets' | 'houses') => void
+  onSelectPlanet?: (planetName: string) => void
+  onSelectHouse?: (houseNumber: number) => void
 }
 
 type PlanetFilter = 'all' | 'benefics' | 'malefics' | 'special' | 'vakri' | 'dignified' | 'kendras' | 'trikonas'
 
-export const TechnicalTables: React.FC<TechnicalTablesProps> = ({
-  chart,
-  tableTab,
-  selectedPlanet,
-  selectedHouse,
-  onSelectTableTab,
-  onSelectPlanet,
-  onSelectHouse,
-}) => {
+export const TechnicalTables: React.FC<TechnicalTablesProps> = (props) => {
+  const store = useKundliStore()
+  const chart = props.chart || store.chart
+  if (!chart) return null
+
+  const tableTab = props.tableTab ?? store.tableTab
+  const selectedPlanet = props.selectedPlanet ?? store.selectedPlanet
+  const selectedHouse = props.selectedHouse ?? store.selectedHouse
+  const onSelectTableTab = props.onSelectTableTab ?? store.setTableTab
+  const onSelectPlanet = props.onSelectPlanet ?? store.selectPlanet
+  const onSelectHouse = props.onSelectHouse ?? store.selectHouse
+
   const [planetFilter, setPlanetFilter] = useState<PlanetFilter>('all')
 
   // Natural benefics & malefics in classical Vedic Jyotish

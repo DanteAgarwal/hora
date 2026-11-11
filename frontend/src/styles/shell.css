@@ -11,12 +11,14 @@
   color: #edf3fb;
 }
 
-@media (max-width: 1300px) {
+@media (max-width: 1280px) {
   .app-shell {
     grid-template-columns: 220px minmax(0, 1fr);
   }
-  .app-shell > aside.inspector-panel {
-    display: none;
+  .app-shell > aside.inspector,
+  .app-shell > aside.universal-inspector,
+  .desktop-inspector {
+    display: none !important;
   }
 }
 

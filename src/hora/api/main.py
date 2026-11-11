@@ -46,6 +46,7 @@ from hora.api.routers import (
     sodhana,
     strength,
     tithis,
+    transits,
     util,
     vakri,
     vargas,
@@ -109,6 +110,7 @@ app.include_router(book_charts.router)
 app.include_router(marakas.router)
 app.include_router(longevity.router)
 app.include_router(vakri.router)
+app.include_router(transits.router)
 
 
 @app.get("/health", response_model=HealthOut, tags=["meta"])
