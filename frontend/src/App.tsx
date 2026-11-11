@@ -1,4 +1,5 @@
 import { Suspense, lazy } from 'react'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import './App.css'
 import {
   KundliProvider,
@@ -13,6 +14,7 @@ import { VedicCockpit } from './components/overview/VedicCockpit'
 import { AstrologicalRadar } from './components/overview/AstrologicalRadar'
 import { TechnicalTables } from './components/overview/TechnicalTables'
 import type { CalculationSettingsConfig } from './components/research/ConfigurationPanel'
+import type { AstroChart } from './types/astro'
 
 // ---------------------------------------------------------------------------
 // Route & Tab Code-Splitting: Lazy-Loaded Heavy Workspaces
@@ -93,6 +95,83 @@ function WorkspaceSkeleton({ title }: { title?: string }) {
       <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem', marginTop: 16 }}>
         Loading {title || 'workspace'}...
       </p>
+    </div>
+  )
+}
+
+function OverviewWorkspace({ chart }: { chart: AstroChart }) {
+  return (
+    <>
+      <section className="main-panel panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Astronomical Epoch & Coordinates</p>
+            <h3>{chart.metadata.dateFormatted} • {chart.metadata.timeFormatted}</h3>
+          </div>
+          <div className="meta-block">
+            <span>📍 {chart.metadata.location} ({chart.metadata.latitude}, {chart.metadata.longitude})</span>
+            <span>🌐 {chart.metadata.timezone} • {chart.metadata.ayanamsaName} ({chart.metadata.ayanamsaDms})</span>
+          </div>
+        </div>
+
+        <div className="chart-layout">
+          <div className="chart-board" style={{ padding: 0, background: 'transparent', border: 'none' }}>
+            <VedicChart defaultStyle="north" />
+          </div>
+          <AstrologicalRadar />
+        </div>
+      </section>
+
+      <TechnicalTables />
+    </>
+  )
+}
+
+function VargasWorkspaceWrapper({
+  chart,
+  savedCharts,
+  applyChart,
+  setSelectedNav,
+}: {
+  chart: AstroChart
+  savedCharts: any[]
+  applyChart: (chart: any) => void
+  setSelectedNav: (nav: any) => void
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <VargaWorkspace />
+
+      {savedCharts.length > 0 && (
+        <section className="panel" style={{ marginTop: 8 }}>
+          <div className="section-header">
+            <h3>Saved Charts Archive</h3>
+            <span className="eyebrow">{savedCharts.length} saved</span>
+          </div>
+          <div className="saved-charts-list">
+            {savedCharts.map((sc) => {
+              const isActive = chart.id === sc.id
+              return (
+                <div
+                  key={sc.id}
+                  className={`saved-chart-row ${isActive ? 'active-chart' : ''}`}
+                  onClick={() => {
+                    applyChart(sc)
+                    setSelectedNav('Overview')
+                  }}
+                  title="Click to view this Kundli chart in Overview"
+                >
+                  <div>
+                    <strong>{sc.name}</strong> {isActive && <span className="active-tag">● Active</span>}
+                  </div>
+                  <span>📍 {sc.location || sc.birthData?.place?.name || '—'}</span>
+                  <span>🕉️ Lagna: {sc.lagna || '—'}</span>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
     </div>
   )
 }
@@ -302,107 +381,125 @@ function AppShell() {
         {/* Central Vedic Cockpit - Reads directly from store */}
         <VedicCockpit />
 
-        {/* 1. Overview Tab */}
-        {selectedNav === 'Overview' && (
-          <>
-            <section className="main-panel panel">
-              <div className="section-heading">
-                <div>
-                  <p className="eyebrow">Astronomical Epoch & Coordinates</p>
-                  <h3>{chart.metadata.dateFormatted} • {chart.metadata.timeFormatted}</h3>
-                </div>
-                <div className="meta-block">
-                  <span>📍 {chart.metadata.location} ({chart.metadata.latitude}, {chart.metadata.longitude})</span>
-                  <span>🌐 {chart.metadata.timezone} • {chart.metadata.ayanamsaName} ({chart.metadata.ayanamsaDms})</span>
-                </div>
-              </div>
+        {/* Declarative URL Workspace Routes */}
+        <Routes>
+          <Route path="/" element={<OverviewWorkspace chart={chart} />} />
+          <Route path="/charts/:chartId" element={<OverviewWorkspace chart={chart} />} />
 
-              <div className="chart-layout">
-                <div className="chart-board" style={{ padding: 0, background: 'transparent', border: 'none' }}>
-                  <VedicChart defaultStyle="north" />
-                </div>
-                <AstrologicalRadar />
-              </div>
-            </section>
+          <Route
+            path="/vargas"
+            element={
+              <Suspense fallback={<WorkspaceSkeleton title="Varga Divisional Charts" />}>
+                <VargasWorkspaceWrapper
+                  chart={chart}
+                  savedCharts={savedCharts}
+                  applyChart={applyChart}
+                  setSelectedNav={setSelectedNav}
+                />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/charts/:chartId/vargas"
+            element={
+              <Suspense fallback={<WorkspaceSkeleton title="Varga Divisional Charts" />}>
+                <VargasWorkspaceWrapper
+                  chart={chart}
+                  savedCharts={savedCharts}
+                  applyChart={applyChart}
+                  setSelectedNav={setSelectedNav}
+                />
+              </Suspense>
+            }
+          />
 
-            <TechnicalTables />
-          </>
-        )}
+          <Route
+            path="/timing"
+            element={
+              <Suspense fallback={<WorkspaceSkeleton title="Vimshottari Dasha Engine" />}>
+                <DashaTimeline />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/charts/:chartId/timing"
+            element={
+              <Suspense fallback={<WorkspaceSkeleton title="Vimshottari Dasha Engine" />}>
+                <DashaTimeline />
+              </Suspense>
+            }
+          />
 
-        {/* 2. Charts / Vargas Tab (Lazy-Loaded) */}
-        {selectedNav === 'Charts' && (
-          <Suspense fallback={<WorkspaceSkeleton title="Varga Divisional Charts" />}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              <VargaWorkspace />
+          <Route
+            path="/transits"
+            element={
+              <Suspense fallback={<WorkspaceSkeleton title="Live Gochara & Sade Sati Tracker" />}>
+                <TransitWorkspace />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/charts/:chartId/transits"
+            element={
+              <Suspense fallback={<WorkspaceSkeleton title="Live Gochara & Sade Sati Tracker" />}>
+                <TransitWorkspace />
+              </Suspense>
+            }
+          />
 
-              {savedCharts.length > 0 && (
-                <section className="panel" style={{ marginTop: 8 }}>
-                  <div className="section-header">
-                    <h3>Saved Charts Archive</h3>
-                    <span className="eyebrow">{savedCharts.length} saved</span>
-                  </div>
-                  <div className="saved-charts-list">
-                    {savedCharts.map((sc) => {
-                      const isActive = chart.id === sc.id
-                      return (
-                        <div
-                          key={sc.id}
-                          className={`saved-chart-row ${isActive ? 'active-chart' : ''}`}
-                          onClick={() => {
-                            applyChart(sc)
-                            setSelectedNav('Overview')
-                          }}
-                          title="Click to view this Kundli chart in Overview"
-                        >
-                          <div>
-                            <strong>{sc.name}</strong> {isActive && <span className="active-tag">● Active</span>}
-                          </div>
-                          <span>📍 {sc.location || sc.birthData?.place?.name || '—'}</span>
-                          <span>🕉️ Lagna: {sc.lagna || '—'}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </section>
-              )}
-            </div>
-          </Suspense>
-        )}
+          <Route
+            path="/analysis"
+            element={
+              <Suspense fallback={<WorkspaceSkeleton title="Dignity & Shadbala Analysis" />}>
+                <AnalysisWorkspace />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/charts/:chartId/analysis"
+            element={
+              <Suspense fallback={<WorkspaceSkeleton title="Dignity & Shadbala Analysis" />}>
+                <AnalysisWorkspace />
+              </Suspense>
+            }
+          />
 
-        {/* 3. Timing / Dasha Timeline Tab (Lazy-Loaded) */}
-        {selectedNav === 'Timing' && (
-          <Suspense fallback={<WorkspaceSkeleton title="Vimshottari Dasha Engine" />}>
-            <DashaTimeline />
-          </Suspense>
-        )}
+          <Route
+            path="/research"
+            element={
+              <Suspense fallback={<WorkspaceSkeleton title="Research Workbench & Raw Data" />}>
+                <ResearchWorkspace onApplySettings={handleApplySettings} />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/charts/:chartId/research"
+            element={
+              <Suspense fallback={<WorkspaceSkeleton title="Research Workbench & Raw Data" />}>
+                <ResearchWorkspace onApplySettings={handleApplySettings} />
+              </Suspense>
+            }
+          />
 
-        {/* 4. Transits / Gochara Tab (Lazy-Loaded) */}
-        {selectedNav === 'Transits' && (
-          <Suspense fallback={<WorkspaceSkeleton title="Live Gochara & Sade Sati Tracker" />}>
-            <TransitWorkspace />
-          </Suspense>
-        )}
+          <Route
+            path="/learn"
+            element={
+              <Suspense fallback={<WorkspaceSkeleton title="Classical Vedic Encyclopedia" />}>
+                <LearnWorkspace />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/charts/:chartId/learn"
+            element={
+              <Suspense fallback={<WorkspaceSkeleton title="Classical Vedic Encyclopedia" />}>
+                <LearnWorkspace />
+              </Suspense>
+            }
+          />
 
-        {/* 5. Analysis / Shadbala & Yogas Tab (Lazy-Loaded) */}
-        {selectedNav === 'Analysis' && (
-          <Suspense fallback={<WorkspaceSkeleton title="Dignity & Shadbala Analysis" />}>
-            <AnalysisWorkspace />
-          </Suspense>
-        )}
-
-        {/* 6. Research & Provenance Tab (Lazy-Loaded) */}
-        {selectedNav === 'Research' && (
-          <Suspense fallback={<WorkspaceSkeleton title="Research Workbench & Raw Data" />}>
-            <ResearchWorkspace onApplySettings={handleApplySettings} />
-          </Suspense>
-        )}
-
-        {/* 7. Learn & Encyclopedia Tab (Lazy-Loaded) */}
-        {selectedNav === 'Learn' && (
-          <Suspense fallback={<WorkspaceSkeleton title="Classical Vedic Encyclopedia" />}>
-            <LearnWorkspace />
-          </Suspense>
-        )}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </main>
 
       {/* Persistent / Responsive Universal Inspector - Reads directly from store */}
