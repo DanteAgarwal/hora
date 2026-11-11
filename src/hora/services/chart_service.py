@@ -1,6 +1,8 @@
 """Chart services: rasi, divisional charts and upagrahas."""
 from __future__ import annotations
 
+from functools import lru_cache
+
 from hora.api.serialize import chart_out, envelope, sign_and_degree, varga_out
 from hora.charts.chart import Chart, Place, compute_chart
 from hora.charts.special_lagna import (
@@ -23,6 +25,7 @@ from hora.core.settings import Settings
 from hora.core.timeutil import Instant, jd_to_local_str
 
 
+@lru_cache(maxsize=128)
 def rasi_chart(instant: Instant, place: Place, settings: Settings) -> dict:
     return chart_out(compute_chart(instant, place, settings))
 
@@ -41,6 +44,7 @@ def varga_charts(
     return {**envelope(instant, place, settings), "charts": out}
 
 
+@lru_cache(maxsize=128)
 def shodasavarga_charts(instant: Instant, place: Place, settings: Settings) -> dict:
     chart = compute_chart(instant, place, settings)
     return {
@@ -49,6 +53,7 @@ def shodasavarga_charts(instant: Instant, place: Place, settings: Settings) -> d
     }
 
 
+@lru_cache(maxsize=128)
 def upagraha_chart(instant: Instant, place: Place, settings: Settings) -> dict:
     """All eleven upagrahas, with the day or night period they were derived from.
 
@@ -118,7 +123,8 @@ def _upagraha_out(chart: Chart, period, positions, place, settings) -> dict:
     }
 
 
-def special_lagnas(instant, place: Place, settings: Settings) -> dict:
+@lru_cache(maxsize=128)
+def special_lagnas(instant: Instant, place: Place, settings: Settings) -> dict:
     """The four special lagnas of chapter 5.
 
     Raises ValueError at latitudes where the Sun does not rise or set.

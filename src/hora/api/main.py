@@ -7,6 +7,7 @@ requests against both this service and recorded JHora output.
 from __future__ import annotations
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from hora import __version__
 from hora.api import errors
@@ -50,9 +51,11 @@ from hora.api.routers import (
     util,
     vakri,
     vargas,
+    workbench,
     yogas,
 )
 from hora.core.settings import Settings
+from hora.storage.chart_db import init_db
 
 app = FastAPI(
     title="Hora Calculation API",
@@ -72,6 +75,14 @@ app = FastAPI(
 )
 
 errors.install(app)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(ephemeris.router)
 app.include_router(charts.router)
@@ -111,6 +122,10 @@ app.include_router(marakas.router)
 app.include_router(longevity.router)
 app.include_router(vakri.router)
 app.include_router(transits.router)
+app.include_router(workbench.router)
+
+# Initialize database schema on startup
+init_db()
 
 
 @app.get("/health", response_model=HealthOut, tags=["meta"])
@@ -122,3 +137,40 @@ def health() -> dict:
          summary="Every calculation knob and its default")
 def settings_schema() -> dict:
     return {"defaults": Settings().model_dump(mode="json"), "schema": Settings.model_json_schema()}
+
+
+# ---------------------------------------------------------------------------
+# Static Frontend Serving & Single Page App (SPA) Wildcard Fallback
+# ---------------------------------------------------------------------------
+
+from pathlib import Path
+from fastapi import HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+_frontend_dist = Path(__file__).resolve().parent.parent.parent.parent / "frontend" / "dist"
+if _frontend_dist.exists():
+    _assets_dir = _frontend_dist / "assets"
+    if _assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(_assets_dir)), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa_or_static(full_path: str):
+        # Do not catch API or documentation endpoints
+        if (
+            full_path.startswith("api/")
+            or full_path.startswith("v1/")
+            or full_path.startswith("docs")
+            or full_path.startswith("redoc")
+            or full_path.startswith("openapi.json")
+        ):
+            raise HTTPException(status_code=404, detail="Not found")
+
+        target_file = _frontend_dist / full_path
+        if full_path and target_file.is_file():
+            return FileResponse(target_file)
+
+        index_file = _frontend_dist / "index.html"
+        if index_file.exists():
+            return FileResponse(index_file)
+        raise HTTPException(status_code=404, detail="Frontend index.html not found")

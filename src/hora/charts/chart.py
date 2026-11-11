@@ -7,6 +7,7 @@ plus settings in, a fully populated :class:`Chart` out.  Everything downstream
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import lru_cache
 
 from hora.charts.bhava import Bhava, build_bhavas, classify_house, house_of
 from hora.charts.dignity import (
@@ -112,11 +113,11 @@ def nakshatra_of(longitude: float) -> tuple[int, int]:
     return nak, pada
 
 
-def compute_chart(
+@lru_cache(maxsize=256)
+def _cached_compute_chart(
     instant: Instant,
     place: Place,
     settings: Settings,
-    *,
     grahas: tuple[int, ...] | None = None,
 ) -> Chart:
     """Compute a natal chart for an instant and place."""
@@ -179,3 +180,20 @@ def compute_chart(
         grahas=states,
         planetary_war=graha_yuddha(positions),
     )
+
+
+def compute_chart(
+    instant: Instant,
+    place: Place,
+    settings: Settings,
+    *,
+    grahas: tuple[int, ...] | None = None,
+) -> Chart:
+    """Compute a natal chart for an instant and place."""
+    if grahas is not None and not isinstance(grahas, tuple):
+        grahas = tuple(grahas)
+    return _cached_compute_chart(instant, place, settings, grahas)
+
+
+compute_chart.cache_info = _cached_compute_chart.cache_info
+compute_chart.cache_clear = _cached_compute_chart.cache_clear

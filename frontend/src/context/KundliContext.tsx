@@ -107,7 +107,7 @@ export interface KundliStoreState {
   setHelpTermId: (termId: string | null) => void
 }
 
-export async function fetchJsonWithRetry(path: string, init?: RequestInit) {
+async function fetchJsonWithRetry(path: string, init?: RequestInit) {
   let lastError: Error | null = null
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -170,20 +170,6 @@ export function KundliProvider({ children }: { children: React.ReactNode }) {
     setSelectedNavState(routeNav)
   }, [routeNav])
 
-  // Sync active chart when URL route chartId changes (e.g. Back/Forward or direct link)
-  useEffect(() => {
-    if (routeChartId && chart && String(chart.id) !== routeChartId) {
-      const found = savedCharts.find((c) => String(c.id) === routeChartId)
-      if (found) {
-        applyChart(found, false)
-      } else {
-        void fetchJsonWithRetry(`/api/charts/${routeChartId}`)
-          .then((fetched) => applyChart(fetched, false))
-          .catch(() => { })
-      }
-    }
-  }, [routeChartId, chart, savedCharts, applyChart])
-
   // Custom setSelectedNav that updates URL route
   const setSelectedNav = useCallback((nav: NavKey) => {
     setSelectedNavState(nav)
@@ -239,6 +225,20 @@ export function KundliProvider({ children }: { children: React.ReactNode }) {
       }
     }
   }, [location.pathname, navigate, routeNav])
+
+  // Sync active chart when URL route chartId changes (e.g. Back/Forward or direct link)
+  useEffect(() => {
+    if (routeChartId && chart && String(chart.id) !== routeChartId) {
+      const found = savedCharts.find((c) => String(c.id) === routeChartId)
+      if (found) {
+        applyChart(found, false)
+      } else {
+        void fetchJsonWithRetry(`/api/charts/${routeChartId}`)
+          .then((fetched) => applyChart(fetched, false))
+          .catch(() => {})
+      }
+    }
+  }, [routeChartId, chart, savedCharts, applyChart])
 
   // Recalculate currently active chart
   const recalculateCurrent = useCallback(async () => {

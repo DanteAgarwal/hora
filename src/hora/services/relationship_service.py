@@ -1,6 +1,8 @@
 """Planetary relationship service — book §3.4."""
 from __future__ import annotations
 
+from functools import lru_cache
+
 from hora.charts.relationship import (
     CLASSICAL_SEVEN,
     COMPOUND_GLOSS,
@@ -128,6 +130,7 @@ def compound_relation(
     }
 
 
+@lru_cache(maxsize=64)
 def natural_relation(graha: int, other: int) -> dict:
     """§3.4.1 — Table 7's value plus the derivation that produces it."""
     derived = derive_natural(graha, other)
@@ -265,19 +268,23 @@ def rules() -> dict:
     }
 
 
+@lru_cache(maxsize=1)
 def natural_table() -> list[dict]:
     """Table 7, for the reference endpoints."""
     return table_7()
 
 
+@lru_cache(maxsize=64)
 def relation_of(graha: int, other: int) -> str:
     """Table 7's label alone."""
     return natural(graha, other)
 
 
+@lru_cache(maxsize=16)
 def row(graha: int) -> dict[str, list[int]]:
     return natural_row(graha)
 
 
+@lru_cache(maxsize=144)
 def temporary_pair(graha_rasi: int, other_rasi: int) -> str:
     return temporary(graha_rasi, other_rasi)

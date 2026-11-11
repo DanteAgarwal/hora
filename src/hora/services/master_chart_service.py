@@ -20,6 +20,7 @@ Computes the entire Vedic astrological chart in a single in-memory Python pass:
 from __future__ import annotations
 
 import datetime
+from functools import lru_cache
 from typing import Any
 
 from hora.api.serialize import (
@@ -73,12 +74,12 @@ PLANET_SANSKRIT = {
 }
 
 
-def compute_master_chart(
+@lru_cache(maxsize=128)
+def _cached_master_chart(
     instant: Instant,
     place: Place,
     settings: Settings,
     name: str = "Native",
-    birth_data_dict: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Compute the entire Vedic astrological chart in one pass."""
     # 1. Base Ephemeris Chart
@@ -377,3 +378,18 @@ def compute_master_chart(
         "yogas": yogas_data,
         "purushartha": purushartha,
     }
+
+
+def compute_master_chart(
+    instant: Instant,
+    place: Place,
+    settings: Settings,
+    name: str = "Native",
+    birth_data_dict: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Compute the entire Vedic astrological chart in one pass (with in-memory LRU caching)."""
+    return _cached_master_chart(instant, place, settings, name)
+
+
+compute_master_chart.cache_info = _cached_master_chart.cache_info
+compute_master_chart.cache_clear = _cached_master_chart.cache_clear

@@ -1,6 +1,8 @@
 """Chapter 12 — ashtakavarga, as the API sees it."""
 from __future__ import annotations
 
+from functools import lru_cache
+
 from hora.charts.ashtakavarga import (
     AshtakavargaError,
     available_tables,
@@ -430,6 +432,7 @@ def rules() -> dict:
     }
 
 
+@lru_cache(maxsize=16)
 def table(owner: str) -> dict:
     """One of the eight tables, in the shape the book prints it."""
     return describe(str(owner))

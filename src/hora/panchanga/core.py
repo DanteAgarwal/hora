@@ -8,6 +8,7 @@ that is reproduced here by walking forward until the next sunrise is passed.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 
 import swisseph as swe
 
@@ -194,6 +195,7 @@ def _walk(
     return out
 
 
+@lru_cache(maxsize=256)
 def day_structure(instant: Instant, latitude: float, longitude: float, altitude: float, settings: Settings) -> DayStructure:
     """Sunrise, sunset and the following sunrise for the local day."""
     eph = get_ephemeris(settings)
@@ -217,6 +219,7 @@ def day_structure(instant: Instant, latitude: float, longitude: float, altitude:
     )
 
 
+@lru_cache(maxsize=256)
 def compute_panchanga(
     instant: Instant,
     latitude: float,

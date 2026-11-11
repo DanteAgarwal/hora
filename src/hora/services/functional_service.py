@@ -1,6 +1,8 @@
 """Section 13.2 — functional nature, service layer."""
 from __future__ import annotations
 
+from functools import lru_cache
+
 from hora.charts.functional import (
     FUNCTIONAL_PLANETS,
     FunctionalError,
@@ -53,6 +55,7 @@ def _nature(result) -> dict:
     }
 
 
+@lru_cache(maxsize=16)
 def lagna(sign: int) -> dict:
     """Every planet's functional nature for one lagna."""
     body = for_lagna(sign)
@@ -67,6 +70,7 @@ def lagna(sign: int) -> dict:
     }
 
 
+@lru_cache(maxsize=256)
 def planet(name: str, sign: int, waxing: bool | None = None) -> dict:
     """One planet's functional nature. `waxing` only matters for the Moon."""
     if name == "Moon" and waxing is not None:

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from functools import lru_cache
 
 from hora.api.serialize import dasha_out, envelope
 from hora.charts.chart import Place, compute_chart
@@ -20,6 +21,7 @@ class BadAsOf(ValueError):
     """Raised when ``as_of`` is not an ISO 8601 datetime."""
 
 
+@lru_cache(maxsize=128)
 def dasha_tree(
     instant: Instant,
     place: Place,
